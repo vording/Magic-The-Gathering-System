@@ -1,0 +1,239 @@
+/* 共通テーマ：Magic Online v3 の対戦画面風（黒〜チャコールの控えめなUI＋フェルトの戦場） */
+:root {
+  --ink: #e4e4e4;
+  --muted: #a8a8a8;
+  --bg: #323232;
+  --panel: #3a3a3a;
+  --panel-2: #404040;
+  --line: #515151;
+  --line-hi: #686868;
+  --sel: #5c5c5c;
+  --white: #ffffff;
+  --raised: inset 1px 1px #6a6a6a, inset -1px -1px #050505;
+  --sunken: inset 1px 1px #050505, inset -1px -1px #5c5c5c;
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.5L5 9L9.5 3' fill='none' stroke='%23e4e4e4' stroke-width='1.6'/%3E%3C/svg%3E");
+
+  /* 戦場の色（緑・既定）。原色を避け、UIの暗いトーンに馴染むくすんだ色にする */
+  --felt: #335a32;
+  --felt-line: rgba(0, 0, 0, .35);
+}
+:root[data-felt="white"] { --felt: #928e82; --felt-line: rgba(0, 0, 0, .25); }
+:root[data-felt="blue"]  { --felt: #304760; }
+:root[data-felt="black"] { --felt: #2c292e; --felt-line: rgba(255, 255, 255, .08); }
+:root[data-felt="red"]   { --felt: #633129; }
+:root[data-felt="green"] { --felt: #335a32; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: "MS UI Gothic", Tahoma, Verdana, "Meiryo UI", "Meiryo", "Hiragino Sans", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--bg);
+}
+
+a { color: var(--ink); }
+
+/* フェルトの面（戦場・検索結果など） */
+.felt {
+  background: var(--felt);
+  transition: background-color .2s;
+}
+
+/* ---------- パネル ---------- */
+
+.panel {
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid #000;
+  box-shadow: var(--raised);
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 25px;
+  margin: 1px 1px 0;
+  padding: 0 7px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--ink);
+  background: #4a4a4a;
+  border-bottom: 1px solid #000;
+  box-shadow: inset 1px 1px #5e5e5e;
+}
+.panel-body { padding: 8px; }
+
+.list, .chat, .well { color: var(--ink); background: #2d2d2d; border: 1px solid #444444; box-shadow: var(--sunken); }
+
+/* カードプレビューの白い額縁 */
+.card-frame {
+  padding: 5px;
+  background: #e8e8e4;
+  border: 1px solid #000;
+  box-shadow: inset 1px 1px #fff, inset -1px -1px #9a9a96;
+}
+
+/* ---------- ボタン（控えめ） ---------- */
+
+button {
+  font: 14px "MS UI Gothic", Tahoma, Verdana, "Meiryo UI", "Meiryo", sans-serif;
+  color: var(--ink);
+  background: #464646;
+  border: 1px solid #000;
+  border-radius: 0;
+  box-shadow: var(--raised);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { background: #4c4c4c; }
+button:active:not(:disabled) { background: #404040; box-shadow: var(--sunken); }
+button:focus-visible { outline: 1px solid #aaa; outline-offset: 1px; }
+button:disabled { color: #8a8a8a; cursor: default; }
+button.primary { color: var(--white); font-weight: bold; outline: 1px solid #747474; outline-offset: -1px; }
+
+/* ---------- 入力 ---------- */
+
+input[type="search"], input[type="text"], select {
+  font: 14px "MS UI Gothic", Tahoma, Verdana, "Meiryo UI", "Meiryo", sans-serif;
+  color: var(--ink);
+  background: #2d2d2d;
+  border: 1px solid #444444;
+  border-radius: 0;
+  box-shadow: var(--sunken);
+  padding: 3px 5px;
+}
+input:focus, select:focus { outline: 1px dotted #8a8a8a; outline-offset: -3px; }
+select option, select optgroup { background: #3a3a3a; color: var(--ink); }
+::placeholder { color: #686868; }
+
+input[type="checkbox"] {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  flex: none;
+  background: #2d2d2d center / 10px no-repeat;
+  border: 1px solid #444444;
+  box-shadow: var(--sunken);
+  cursor: pointer;
+}
+input[type="checkbox"]:checked { background-image: var(--check); }
+input[type="radio"] { accent-color: #8a8a8a; margin: 0; }
+
+/* ---------- 上下のバー ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 36px;
+  padding: 3px 10px;
+  background: #3e3e3e;
+  border-bottom: 1px solid #000;
+  box-shadow: inset 0 -1px #4a4a4a;
+}
+.logo { margin: 0; font-size: 15px; font-weight: bold; white-space: nowrap; color: var(--ink); }
+.logo small { margin-left: 6px; font-size: 14px; font-weight: normal; color: var(--muted); }
+.spacer { flex: 1; }
+
+/* 戦場の色の切り替え */
+.felt-picker { display: flex; align-items: center; gap: 4px; color: var(--muted); white-space: nowrap; }
+.felt-swatch, .felt-swatch:hover:not(:disabled), .felt-swatch:active:not(:disabled) {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #000;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #646464;
+}
+.felt-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px #ddd; }
+.felt-white { background: #928e82; }
+.felt-blue  { background: #304760; }
+.felt-black { background: #2c292e; }
+.felt-red   { background: #633129; }
+.felt-green { background: #335a32; }
+
+.bottombar {
+  display: flex;
+  align-items: stretch;
+  height: 26px;
+  background: #3e3e3e;
+  border-top: 1px solid #000;
+  box-shadow: inset 0 1px 0 #4a4a4a;
+}
+.bottombar a, .bottombar span {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border-right: 1px solid #000;
+}
+.bottombar a:hover { color: var(--ink); }
+.bottombar .active { color: var(--ink); font-weight: bold; background: #343434; box-shadow: var(--sunken); }
+
+/* ---------- ダイアログ ---------- */
+
+dialog {
+  padding: 0;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid #000;
+  border-radius: 0;
+  box-shadow: var(--raised), 3px 3px 0 rgba(0, 0, 0, .55);
+}
+dialog::backdrop { background: rgba(0, 0, 0, .5); }
+.dialog-body { padding: 10px 12px 12px; }
+.dialog-actions { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 10px; }
+.dialog-actions a { margin-right: auto; }
+.dialog-actions button { min-width: 76px; }
+dialog .status, dialog .hint { color: var(--muted); }
+
+* { scrollbar-color: #646464 #343434; scrollbar-width: thin; }
+
+/* ---------- 4:3 の枠 ----------
+   画面の中央に 4:3 の枠を置き、余った部分は黒い帯にする。
+   枠の中のサイズ指定は cqw / cqh（枠の幅・高さに対する割合）を使う */
+html, body { height: 100%; }
+.app {
+  container-type: size;
+  overflow: hidden;
+  background: var(--bg);
+}
+html:not(.phone) body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+html:not(.phone) .app {
+  flex: none;
+  width: min(100vw, calc(100vh * 4 / 3));
+  height: min(100vh, calc(100vw * 3 / 4));
+  box-shadow: 0 0 0 1px #444444;
+}
+
+/* ---------- スマホ（device.js が <html class="phone"> にする） ----------
+   4:3 の枠をやめて画面いっぱいに表示し、指で押しやすい大きさにする */
+html.phone body { overflow: hidden; }
+html.phone .app { width: 100vw; height: 100vh; height: 100dvh; }
+html.phone button { min-height: 32px; padding: 4px 10px; }
+/* iOS は 16px 未満の入力欄に触れると拡大してしまう */
+html.phone input[type="search"], html.phone input[type="text"], html.phone select { font-size: 16px; }
+html.phone .topbar { gap: 8px; padding: 4px 6px; flex-wrap: wrap; }
+html.phone .logo small { display: none; }
+html.phone .felt-swatch { width: 22px; height: 22px; min-height: 0; }
+html.phone .card, html.phone .card img, html.phone .result img {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}

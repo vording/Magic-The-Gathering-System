@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MTG Deck Maker</title>
+  <link rel="stylesheet" href="theme.css?v=12">
+  <link rel="stylesheet" href="style.css?v=25">
+  <script src="device.js?v=1"></script>
+  <script src="felt.js?v=4"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1 class="logo">MTG<small>Deck Maker</small></h1>
+      <span class="spacer"></span>
+      <span id="felt-picker" class="felt-picker"></span>
+      <label class="format-select">
+        フォーマット
+        <select id="format"></select>
+      </label>
+      <label class="toggle"><input id="ja" type="checkbox"> 日本語版で表示</label>
+      <label class="toggle"><input id="oldest" type="checkbox"> 初版の絵柄で表示</label>
+    </header>
+
+    <!-- スマホ用：検索とデッキの切り替え -->
+    <nav class="phone-tabs">
+      <button type="button" data-phone-tab="search">カード検索</button>
+      <button type="button" data-phone-tab="deck">デッキ（<span id="phone-deck-count">0</span>枚）</button>
+    </nav>
+
+    <main class="layout">
+      <section class="panel search-panel">
+        <h2 class="panel-head">カード検索</h2>
+        <div class="panel-body search-body">
+          <form id="search-form" class="search-form">
+            <input id="query" type="search" placeholder="カード名・Scryfall検索構文（例: 稲妻 / t:creature c:r）" autocomplete="off">
+            <button type="submit" class="primary">検索</button>
+          </form>
+          <p id="search-status" class="status">選択中のフォーマットでリーガルなカードのみ表示されます。</p>
+          <div id="results" class="results well"></div>
+          <button id="more" class="more" hidden>さらに表示</button>
+        </div>
+      </section>
+
+      <section class="panel deck-panel">
+        <h2 class="panel-head">デッキ <span class="deck-total"><span id="deck-count">0</span><span id="deck-target"></span> 枚</span></h2>
+        <div class="panel-body">
+          <div class="deck-switcher">
+            <select id="deck-select" aria-label="デッキを選択"></select>
+            <div class="deck-actions">
+              <button id="deck-new">新規</button>
+              <button id="deck-rename">名前変更</button>
+              <button id="deck-copy">複製</button>
+              <button id="deck-delete">削除</button>
+            </div>
+            <button id="deck-play" class="primary play-btn">一人回し ▶</button>
+          </div>
+          <ul id="warnings" class="warnings"></ul>
+          <h3 class="section-title">マナカーブ</h3>
+          <div id="curve" class="curve well"></div>
+          <div class="section-title-row">
+            <h3 class="section-title">デッキリスト</h3>
+            <button id="clear">クリア</button>
+          </div>
+          <div class="deck-actions io-actions">
+            <button id="export" title="「4 Lightning Bolt」形式。MTG Arena などに貼り付けられます">英語でコピー</button>
+            <button id="export-ja" title="「4 稲妻」形式。日本語版がないカードは英語名">日本語でコピー</button>
+            <button id="import">インポート…</button>
+          </div>
+          <div id="deck" class="deck list"></div>
+          <div class="card-frame preview-frame">
+            <img id="preview" class="preview" alt="" hidden>
+            <div class="preview-empty">カードにマウスを乗せると表示</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      非公式のファンコンテンツです。Wizards of the Coastによる承認・後援を受けたものではありません。
+      カードデータ・画像は <a href="https://scryfall.com/" target="_blank" rel="noopener">Scryfall</a> 提供。
+    </footer>
+
+    <nav class="bottombar">
+      <span class="active">デッキ作成</span>
+      <a href="play.html">一人回し・対戦</a>
+    </nav>
+  </div>
+
+  <dialog id="art-dialog" class="art-dialog">
+    <h2 class="panel-head" id="art-title"></h2>
+    <div class="dialog-body">
+      <p id="art-status" class="status"></p>
+      <div id="art-list" class="art-list well"></div>
+      <div class="dialog-actions">
+        <button id="art-more" hidden>さらに表示</button>
+        <button id="art-reset">自動に戻す</button>
+        <button id="art-cancel" class="primary">キャンセル</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="import-dialog" class="import-dialog">
+    <h2 class="panel-head">デッキのインポート</h2>
+    <form id="import-form" class="dialog-body">
+      <p class="status">デッキリストを貼り付けてください。1行に1種類（例：<code>4 Lightning Bolt</code>、<code>4 稲妻</code>）。英語名・日本語名のどちらでも、MTG Arena の形式でも読み込めます。新しいデッキとして追加され、フォーマットは今のデッキと同じになります。</p>
+      <textarea id="import-text" rows="14" spellcheck="false" placeholder="4 Lightning Bolt&#10;4 稲妻&#10;20 Mountain"></textarea>
+      <label class="field import-name">デッキ名 <input id="import-name" type="text" placeholder="空欄ならリスト内の名前か「インポート」"></label>
+      <p id="import-status" class="status import-status"></p>
+      <div class="dialog-actions">
+        <button type="button" id="import-cancel">閉じる</button>
+        <button type="submit" id="import-run" class="primary">インポート</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js?v=15"></script>
+</body>
+</html>

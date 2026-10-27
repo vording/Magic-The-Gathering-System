@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>一人回し・対戦 — MTG Deck Maker</title>
+  <link rel="stylesheet" href="theme.css?v=12">
+  <link rel="stylesheet" href="play.css?v=20">
+  <script src="device.js?v=1"></script>
+  <script src="felt.js?v=4"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1 class="logo">MTG<small>Deck Maker</small></h1>
+      <span class="game-title"><span id="deck-name"></span></span>
+      <span id="net-status" class="net-status"></span>
+      <span class="spacer"></span>
+      <span id="felt-picker" class="felt-picker"></span>
+      <button id="undo" title="Ctrl+Z">元に戻す</button>
+      <button id="restart">リスタート</button>
+    </header>
+
+    <main class="table">
+      <!-- 左：カード・状況・フェイズ -->
+      <aside class="col-left">
+        <div class="card-frame preview-frame">
+          <img id="preview" class="preview" alt="" hidden>
+          <div id="preview-text" class="preview-text" hidden></div>
+        </div>
+        <div class="status-box">
+          <div class="status-line">
+            <span id="turn-label" class="turn-label"></span>
+            <span id="land-count" class="land-count" title="このターンにプレイした土地の数"></span>
+          </div>
+          <p id="phase-hint" class="phase-hint"></p>
+        </div>
+        <nav id="phases" class="phases"></nav>
+        <div class="phase-actions">
+          <button id="next-phase" title="Space">次へ</button>
+          <button id="end-turn" class="primary" title="Enter">ターン終了</button>
+        </div>
+      </aside>
+
+      <!-- プレイヤー：ライフ・山札 -->
+      <aside class="col-player">
+        <!-- 相手（ネット対戦のときだけ表示） -->
+        <div id="opp-player" class="player-block opp" hidden>
+          <div class="avatar" aria-hidden="true"></div>
+          <div class="player-name" id="opp-player-name"></div>
+          <div class="life"><span id="opp-life" class="opp-life"></span></div>
+          <div class="piles">
+            <div class="pile static" title="ライブラリーの枚数">
+              <span class="pile-icon" aria-hidden="true">▤</span>
+              <span class="pile-count" id="opp-library-count"></span>
+              <span class="pile-name">ライブラリー</span>
+            </div>
+            <div class="pile static" title="手札の枚数">
+              <span class="pile-icon" aria-hidden="true">✋</span>
+              <span class="pile-count" id="opp-hand-count"></span>
+              <span class="pile-name">手札</span>
+            </div>
+            <div class="pile" id="opp-pile-graveyard" title="墓地：クリックで一覧">
+              <span class="pile-icon" aria-hidden="true">✝</span>
+              <span class="pile-count" id="opp-graveyard-count"></span>
+              <span class="pile-name">墓地</span>
+            </div>
+            <div class="pile" id="opp-pile-exile" title="追放：クリックで一覧">
+              <span class="pile-icon" aria-hidden="true">◌</span>
+              <span class="pile-count" id="opp-exile-count"></span>
+              <span class="pile-name">追放</span>
+            </div>
+          </div>
+        </div>
+        <!-- 自分 -->
+        <div class="avatar" aria-hidden="true"></div>
+        <div class="player-name" id="my-player-name">あなた</div>
+        <div class="life">
+          <span id="life" title="クリックで数値を入力"></span>
+          <div class="life-buttons">
+            <button data-life="-1" aria-label="ライフ −1">−</button>
+            <button data-life="1" aria-label="ライフ ＋1">＋</button>
+          </div>
+        </div>
+        <div class="piles">
+          <div class="pile library" id="pile-library" data-zone="library" title="ライブラリー：クリックで1枚引く／右クリックでメニュー">
+            <span class="pile-icon" aria-hidden="true">▤</span>
+            <span class="pile-count" id="library-count"></span>
+            <span class="pile-name">ライブラリー</span>
+          </div>
+          <div class="pile" id="pile-graveyard" data-zone="graveyard" title="墓地：クリックで一覧">
+            <span class="pile-icon" aria-hidden="true">✝</span>
+            <span class="pile-count" id="graveyard-count"></span>
+            <span class="pile-name">墓地</span>
+          </div>
+          <div class="pile" id="pile-exile" data-zone="exile" title="追放：クリックで一覧">
+            <span class="pile-icon" aria-hidden="true">◌</span>
+            <span class="pile-count" id="exile-count"></span>
+            <span class="pile-name">追放</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 中央：戦場（フェルト）と手札 -->
+      <section class="board">
+        <!-- 相手の戦場（ネット対戦のときだけ表示） -->
+        <div id="opp-area" class="opp-area" hidden>
+          <div id="opp-status" class="opp-status"></div>
+          <div class="battlefield opp">
+            <div id="opp-lands" class="bf-row lands"></div>
+            <div id="opp-main" class="bf-row"></div>
+          </div>
+        </div>
+        <div id="mulligan-bar" class="banner" hidden></div>
+        <div class="battlefield" data-zone="battlefield">
+          <div id="bf-main" class="bf-row"></div>
+          <div id="bf-lands" class="bf-row lands"></div>
+        </div>
+        <div class="hand-area" data-zone="hand">
+          <div class="zone-label">手札 <span id="hand-count"></span></div>
+          <div id="hand" class="hand"></div>
+        </div>
+      </section>
+
+      <!-- 右：ログ・コマンド -->
+      <aside class="col-right">
+        <section class="panel log-box">
+          <h2 class="panel-head">ログ</h2>
+          <ol id="log" class="log chat"></ol>
+          <form id="chat-form" class="chat-form" hidden autocomplete="off">
+            <input id="chat-input" type="text" placeholder="メッセージ" maxlength="300">
+            <button type="submit">送信</button>
+          </form>
+        </section>
+        <section class="panel">
+          <h2 class="panel-head">コマンド</h2>
+          <div class="tools" id="tools">
+            <button id="draw">1枚引く（D）</button>
+            <button id="shuffle">シャッフル</button>
+            <button id="look-top">上から見る</button>
+            <button id="search-library">ライブラリーを探す</button>
+            <button id="mill">上から墓地へ</button>
+            <button id="untap-all">すべてアンタップ</button>
+            <button id="token">トークンを出す</button>
+            <div class="felt-picker tools-felt"></div>
+          </div>
+        </section>
+        <p class="hint">
+          手札: ダブルクリックで戦場へ<br>
+          戦場: クリックでタップ（攻撃ステップではクリックで攻撃）<br>
+          右クリックで移動メニュー／ドラッグでも移動できます
+        </p>
+      </aside>
+    </main>
+
+    <!-- スマホ用の画面下のボタン -->
+    <nav class="phone-bar">
+      <a href="index.html">デッキ</a>
+      <button type="button" id="sheet-log-btn" data-phone-sheet="log">ログ・チャット</button>
+      <button type="button" data-phone-sheet="tools">コマンド</button>
+    </nav>
+
+    <nav class="bottombar">
+      <a href="index.html">デッキ作成</a>
+      <span class="active">一人回し・対戦</span>
+    </nav>
+  </div>
+
+  <dialog id="setup" class="setup">
+    <h2 class="panel-head">ゲームの開始</h2>
+    <form method="dialog" id="setup-form" class="dialog-body">
+      <label class="field">デッキ <select id="setup-deck"></select></label>
+      <fieldset class="order well">
+        <legend>遊び方</legend>
+        <label><input type="radio" name="mode" value="solo" checked> 一人回し</label>
+        <label><input type="radio" name="mode" value="host"> ネット対戦：部屋を作る</label>
+        <label><input type="radio" name="mode" value="join"> ネット対戦：部屋に入る
+          <input id="room-code" name="room" type="text" placeholder="部屋コード" maxlength="12" class="room-code"></label>
+        <label class="field name-field">名前 <input id="player-name" name="name" type="text" maxlength="16"></label>
+      </fieldset>
+      <fieldset class="order well">
+        <legend>順番</legend>
+        <label><input type="radio" name="order" value="play" checked> 先手</label>
+        <label><input type="radio" name="order" value="draw"> 後手（1ターン目にドロー）</label>
+        <p id="order-note" class="note" hidden>部屋に入る場合、先手・後手は部屋を作った人の選択で決まります。</p>
+      </fieldset>
+      <p id="setup-error" class="error"></p>
+      <div class="dialog-actions">
+        <a href="index.html">デッキ作成に戻る</a>
+        <button value="start" class="primary">開始</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="viewer" class="viewer">
+    <h2 class="panel-head" id="viewer-title"></h2>
+    <div class="dialog-body">
+      <p class="hint" id="viewer-hint">カードをクリック（右クリック）で移動先を選択</p>
+      <div id="viewer-cards" class="viewer-cards well"></div>
+      <div class="dialog-actions">
+        <button id="viewer-shuffle" hidden>シャッフルして閉じる</button>
+        <button id="viewer-close" class="primary">閉じる</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="menu" class="menu" hidden></div>
+
+  <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+  <script src="net.js?v=1"></script>
+  <script src="play.js?v=7"></script>
+</body>
+</html>

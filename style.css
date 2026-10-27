@@ -1,0 +1,198 @@
+/* デッキ作成画面（共通部分は theme.css） */
+
+.app { display: flex; flex-direction: column; }
+
+.topbar { flex-wrap: wrap; }
+.format-select, .toggle { display: flex; align-items: center; gap: 6px; white-space: nowrap; color: #cfcfcf; cursor: pointer; }
+.format-select select { min-width: 150px; }
+
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 33cqw, 400px);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  gap: 6px;
+  padding: 6px;
+}
+@container (max-width: 900px) { .layout { grid-template-columns: 1fr; grid-template-rows: none; overflow: auto; } }
+
+.footer { padding: 2px 10px 6px; color: #9c9c9c; font-size: 12px; }
+
+/* ---------- 検索 ---------- */
+
+.search-panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.search-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.search-form { display: flex; gap: 6px; }
+.search-form input { flex: 1; min-width: 0; }
+.status { margin: 6px 0; color: var(--muted); }
+
+/* 検索結果はフェルトの上に並べる（戦場の色と連動） */
+.results {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  background: var(--felt);
+}
+.result, .result:hover:not(:disabled), .result:active:not(:disabled) {
+  position: relative;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  text-align: left;
+}
+.result img { width: 100%; display: block; border-radius: 4.75% / 3.5%; }
+.result:hover img { outline: 1px solid #fff; outline-offset: 1px; }
+.result .noimg {
+  aspect-ratio: 488 / 680;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  color: #313131;
+  background: #e8e8e4;
+  border: 1px solid #000;
+  border-radius: 6px;
+}
+.result .badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 20px;
+  padding: 0 5px;
+  text-align: center;
+  font-weight: bold;
+  color: #fff;
+  background: rgba(0, 0, 0, .75);
+  border: 1px solid #888;
+  border-radius: 0;
+}
+.result.maxed img { opacity: .4; filter: grayscale(1); }
+.more { width: 100%; margin-top: 8px; }
+
+/* ---------- デッキ ---------- */
+
+.deck-panel { min-height: 0; overflow: auto; }
+.deck-total { font-weight: normal; color: var(--muted); }
+#deck-count { color: var(--ink); font-weight: bold; }
+
+.deck-switcher { display: flex; flex-direction: column; gap: 6px; }
+.deck-switcher select { width: 100%; }
+.deck-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.deck-switcher .deck-actions button { flex: 1; padding: 3px 4px; }
+.play-btn { width: 100%; padding: 4px; }
+
+.section-title { margin: 10px 0 4px; font-size: 13px; font-weight: bold; color: var(--muted); }
+.section-title-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 10px 0 4px; }
+.section-title-row .section-title { margin: 0; }
+
+.warnings { list-style: none; margin: 8px 0 0; padding: 5px 8px; color: var(--ink); background: #2d2d2d; border: 1px solid #686868; }
+.warnings:empty { display: none; }
+.warnings li::before { content: "! "; font-weight: bold; }
+
+.curve { display: flex; align-items: flex-end; gap: 4px; height: 88px; padding: 6px 6px 4px; }
+.curve .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.curve .fill { width: 70%; min-height: 1px; background: #8a8a8a; box-shadow: inset 1px 1px #b0b0b0, inset -1px 0 #686868; }
+.curve .n { font-size: 12px; }
+.curve .label { font-size: 12px; color: var(--muted); }
+
+.deck { min-height: 60px; max-height: 360px; overflow: auto; padding: 2px 0; }
+.deck h3 { margin: 0; padding: 1px 8px; font-size: 13px; color: var(--muted); background: #3a3a3a; border-top: 1px solid #444444; border-bottom: 1px solid #000; }
+.row { display: flex; align-items: center; gap: 6px; padding: 1px 4px 1px 8px; }
+.row:hover { background: var(--sel); }
+.row .qty { width: 18px; text-align: right; font-weight: bold; }
+.row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .illegal { font-size: 12px; text-decoration: underline; color: var(--muted); }
+.row button { padding: 0 5px; font-size: 12px; line-height: 15px; }
+.row button.art.picked { color: #313131; background: #bdbdbd; }
+.empty { color: var(--muted); margin: 6px 8px; }
+
+.preview-frame { margin-top: 10px; }
+.preview { width: 100%; display: block; border-radius: 4.75% / 3.5%; }
+.preview:not([hidden]) + .preview-empty { display: none; }
+.preview-empty { aspect-ratio: 488 / 680; display: grid; place-items: center; color: #7d7d7d; font-size: 13px; }
+
+/* ---------- 絵柄の選択 ---------- */
+
+.art-dialog { width: min(840px, 94vw); }
+.art-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+  max-height: 62vh;
+  min-height: 120px;
+  overflow: auto;
+  padding: 8px;
+}
+.art-option, .art-option:hover:not(:disabled), .art-option:active:not(:disabled) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px;
+  color: var(--ink);
+  background: none;
+  border: 1px solid transparent;
+  box-shadow: none;
+  text-align: center;
+}
+.art-option img { width: 100%; display: block; border-radius: 4px; }
+.art-option:hover:not(:disabled) img { outline: 1px solid #fff; outline-offset: 1px; }
+.art-option.selected { background: var(--sel); border-color: #aaa; }
+.art-option .noimg { aspect-ratio: 488 / 680; display: grid; place-items: center; border: 1px dashed #5c5c5c; border-radius: 4px; }
+.art-option:disabled { color: #686868; }
+.art-label { font-size: 12px; white-space: nowrap; }
+#art-more { margin-right: auto; }
+
+/* ==========================================================
+   スマホ（<html class="phone">）：検索とデッキをタブで切り替え
+   ========================================================== */
+
+.phone-tabs { display: none; }
+html.phone .phone-tabs { display: flex; gap: 4px; padding: 4px 4px 0; }
+html.phone .phone-tabs button { flex: 1; min-height: 38px; font-size: 15px; }
+html.phone .phone-tabs button[aria-pressed="true"] { font-weight: bold; background: #2d2d2d; box-shadow: var(--sunken); }
+
+html.phone .topbar { gap: 6px 10px; }
+html.phone .topbar .spacer { display: none; }
+html.phone .format-select select { min-width: 0; max-width: 46vw; }
+html.phone .layout { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); gap: 4px; padding: 4px; overflow: hidden; }
+html.phone body:not([data-tab="deck"]) .deck-panel { display: none; }
+html.phone body[data-tab="deck"] .search-panel { display: none; }
+html.phone .panel-body { padding: 6px; }
+html.phone .results { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; padding: 6px; }
+html.phone .deck { max-height: none; }
+html.phone .row { padding: 3px 4px 3px 8px; font-size: 15px; }
+html.phone .row button { min-height: 30px; padding: 0 10px; font-size: 14px; }
+html.phone .preview-frame { width: 60%; margin: 10px auto 0; }
+html.phone .footer { display: none; }
+html.phone .bottombar { height: 44px; }
+html.phone .bottombar a, html.phone .bottombar span { flex: 1; justify-content: center; font-size: 14px; }
+html.phone .art-list { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+
+/* ---------- エクスポート・インポート ---------- */
+
+.io-actions { margin-bottom: 4px; }
+.io-actions button { flex: 1; padding: 3px 4px; }
+.import-dialog { width: min(560px, 94vw); }
+.import-dialog textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 6px;
+  font: 14px "MS Gothic", Consolas, monospace;
+  color: var(--ink);
+  background: #2d2d2d;
+  border: 1px solid #444;
+  box-shadow: var(--sunken);
+  resize: vertical;
+}
+.import-dialog textarea:focus { outline: 1px dotted #8a8a8a; outline-offset: -3px; }
+.import-dialog code { padding: 0 3px; color: var(--ink); background: #2d2d2d; }
+.import-name { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; }
+.import-name input { flex: 1; }
+.import-status { white-space: pre-line; min-height: 1.4em; }
+html.phone .import-dialog textarea { font-size: 16px; min-height: 180px; }
