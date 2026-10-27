@@ -212,13 +212,12 @@ html:not(.phone) body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #000;
+  background: var(--bg); /* 4:3 の枠の外側もウィンドウと同じ色で塗る */
 }
 html:not(.phone) .app {
   flex: none;
   width: min(100vw, calc(100vh * 4 / 3));
   height: min(100vh, calc(100vw * 3 / 4));
-  box-shadow: 0 0 0 1px #444444;
 }
 
 /* ---------- スマホ（device.js が <html class="phone"> にする） ----------
@@ -237,3 +236,24 @@ html.phone .card, html.phone .card img, html.phone .result img {
   user-select: none;
   touch-action: manipulation;
 }
+
+/* ロゴ：PC は正式名、スマホは短い名前 */
+.logo-short { display: none; }
+html.phone .logo-full { display: none; }
+html.phone .logo-short { display: inline; }
+
+/* 表示言語の切り替え（国旗） */
+.lang-picker { display: flex; align-items: center; gap: 4px; }
+.lang-btn, .lang-btn:hover:not(:disabled), .lang-btn:active:not(:disabled) {
+  width: 30px;
+  height: 22px;
+  min-height: 0;
+  padding: 2px;
+  background: #2d2d2d;
+  border: 1px solid #000;
+  box-shadow: var(--sunken);
+  opacity: .55;
+}
+.lang-btn svg { display: block; width: 100%; height: 100%; }
+.lang-btn[aria-pressed="true"] { opacity: 1; box-shadow: var(--raised); background: #5c5c5c; }
+html.phone .lang-btn { width: 34px; height: 26px; }

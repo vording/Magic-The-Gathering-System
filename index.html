@@ -3,17 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MTG Deck Maker</title>
-  <link rel="stylesheet" href="theme.css?v=12">
-  <link rel="stylesheet" href="style.css?v=25">
+  <title>Magic: The Gathering System</title>
+  <link rel="stylesheet" href="theme.css?v=14">
+  <link rel="stylesheet" href="style.css?v=26">
+  <script src="i18n.js?v=1"></script>
   <script src="device.js?v=1"></script>
   <script src="felt.js?v=4"></script>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <h1 class="logo">MTG<small>Deck Maker</small></h1>
+      <h1 class="logo"><span class="logo-full">Magic: The Gathering <small>System</small></span><span class="logo-short">MTG System</span></h1>
       <span class="spacer"></span>
+      <span class="lang-picker"></span>
       <span id="felt-picker" class="felt-picker"></span>
       <label class="format-select">
         フォーマット
@@ -101,6 +103,19 @@
     </div>
   </dialog>
 
+  <dialog id="export-dialog" class="import-dialog">
+    <h2 class="panel-head" id="export-title">デッキリスト</h2>
+    <div class="dialog-body">
+      <textarea id="export-text" rows="14" spellcheck="false"></textarea>
+      <p id="export-status" class="status import-status"></p>
+      <div class="dialog-actions">
+        <button type="button" id="export-close">閉じる</button>
+        <button type="button" id="export-share" hidden>共有…</button>
+        <button type="button" id="export-copy" class="primary">コピー</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="import-dialog" class="import-dialog">
     <h2 class="panel-head">デッキのインポート</h2>
     <form id="import-form" class="dialog-body">
@@ -115,6 +130,6 @@
     </form>
   </dialog>
 
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

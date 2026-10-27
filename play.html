@@ -3,19 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>一人回し・対戦 — MTG Deck Maker</title>
-  <link rel="stylesheet" href="theme.css?v=12">
-  <link rel="stylesheet" href="play.css?v=20">
+  <title>一人回し・対戦 — Magic: The Gathering System</title>
+  <link rel="stylesheet" href="theme.css?v=14">
+  <link rel="stylesheet" href="play.css?v=27">
+  <script src="i18n.js?v=1"></script>
   <script src="device.js?v=1"></script>
   <script src="felt.js?v=4"></script>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <h1 class="logo">MTG<small>Deck Maker</small></h1>
+      <h1 class="logo"><span class="logo-full">Magic: The Gathering <small>System</small></span><span class="logo-short">MTG System</span></h1>
       <span class="game-title"><span id="deck-name"></span></span>
       <span id="net-status" class="net-status"></span>
       <span class="spacer"></span>
+      <span class="lang-picker"></span>
       <span id="felt-picker" class="felt-picker"></span>
       <button id="undo" title="Ctrl+Z">元に戻す</button>
       <button id="restart">リスタート</button>
@@ -37,6 +39,7 @@
         </div>
         <nav id="phases" class="phases"></nav>
         <div class="phase-actions">
+          <button id="phase-current" class="phase-current" title="フェイズを選ぶ"></button>
           <button id="next-phase" title="Space">次へ</button>
           <button id="end-turn" class="primary" title="Enter">ターン終了</button>
         </div>
@@ -106,6 +109,12 @@
         <!-- 相手の戦場（ネット対戦のときだけ表示） -->
         <div id="opp-area" class="opp-area" hidden>
           <div id="opp-status" class="opp-status"></div>
+          <div id="room-banner" class="room-banner" hidden>
+            <span class="room-label">部屋コード</span>
+            <strong id="room-code-big" class="room-code-big"></strong>
+            <span class="room-note">このコードを相手に伝えてください</span>
+            <button type="button" id="room-share">共有・コピー</button>
+          </div>
           <div class="battlefield opp">
             <div id="opp-lands" class="bf-row lands"></div>
             <div id="opp-main" class="bf-row"></div>
@@ -143,6 +152,7 @@
             <button id="untap-all">すべてアンタップ</button>
             <button id="token">トークンを出す</button>
             <div class="felt-picker tools-felt"></div>
+            <div class="lang-picker tools-lang"></div>
           </div>
         </section>
         <p class="hint">
@@ -167,7 +177,7 @@
   </div>
 
   <dialog id="setup" class="setup">
-    <h2 class="panel-head">ゲームの開始</h2>
+    <h2 class="panel-head">ゲームの開始 <span class="lang-picker setup-lang"></span></h2>
     <form method="dialog" id="setup-form" class="dialog-body">
       <label class="field">デッキ <select id="setup-deck"></select></label>
       <fieldset class="order well">
@@ -180,7 +190,8 @@
       </fieldset>
       <fieldset class="order well">
         <legend>順番</legend>
-        <label><input type="radio" name="order" value="play" checked> 先手</label>
+        <label><input type="radio" name="order" value="random" checked> ランダム</label>
+        <label><input type="radio" name="order" value="play"> 先手</label>
         <label><input type="radio" name="order" value="draw"> 後手（1ターン目にドロー）</label>
         <p id="order-note" class="note" hidden>部屋に入る場合、先手・後手は部屋を作った人の選択で決まります。</p>
       </fieldset>
@@ -208,6 +219,6 @@
 
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <script src="net.js?v=1"></script>
-  <script src="play.js?v=7"></script>
+  <script src="play.js?v=10"></script>
 </body>
 </html>

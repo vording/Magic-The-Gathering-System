@@ -545,3 +545,45 @@ html.phone .viewer-cards .card { --card-w: 80px; }
   html.phone .board { grid-column: 2; grid-row: 1 / 3; }
   html.phone .zone-label, html.phone .opp-status { height: 20px; line-height: 20px; font-size: 12px; }
 }
+
+/* ---------- 部屋コード（相手を待っている間） ---------- */
+.room-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 12px;
+  margin: 10px auto 0;
+  padding: 10px 16px;
+  max-width: calc(100% - 20px);
+  text-align: center;
+  background: #3a3a3a;
+  border: 1px solid #000;
+  box-shadow: var(--raised);
+}
+.room-label { color: var(--muted); }
+.room-code-big { font: bold 30px Consolas, "Courier New", monospace; letter-spacing: .18em; color: #fff; user-select: all; -webkit-user-select: all; }
+.room-note { flex-basis: 100%; color: var(--muted); font-size: 13px; }
+
+/* ---------- フェイズの選択（スマホ） ---------- */
+.phase-current { display: none; }
+html.phone .phases { display: none; }
+html.phone .phase-current { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
+html.phone .col-left { grid-template-columns: auto minmax(0, 1fr); }
+html.phone .phase-actions { min-width: 0; }
+html.phone .phase-actions button { min-height: 38px; }
+html.phone .room-code-big { font-size: 34px; }
+/* 対戦中は案内（マリガン・相手のターンなど）を中央寄りに出す（上段の部屋コードと重ならないように） */
+body.online .banner { top: 50%; }
+
+/* 国旗：スマホの対戦画面は上のバーに入らないので、コマンド欄に出す */
+.tools-lang { display: none; }
+html.phone .topbar .lang-picker { display: none; }
+html.phone .tools-lang { display: flex; justify-content: center; gap: 10px; padding: 6px 0 2px; }
+
+/* 開始画面の見出しの国旗（開始画面が出ている間は上のバーを押せないため） */
+.setup .panel-head { height: auto; min-height: 25px; padding-top: 2px; padding-bottom: 2px; }
+.setup-lang .lang-btn { width: 26px; height: 18px; }
+html.phone .setup-lang .lang-btn { width: 30px; height: 22px; }
+
+html[lang="en"] .preview-frame:has(#preview[hidden]):has(#preview-text[hidden])::after { content: "Hover over a card to preview it"; }

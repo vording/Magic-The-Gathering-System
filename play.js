@@ -1,4 +1,4 @@
-// MTG Deck Maker — 一人回し／ネット対戦（MTGO風・ルール処理は手動）
+// Magic: The Gathering System — 一人回し／ネット対戦（MTGO風・ルール処理は手動）
 // 自分のゲーム状態はすべて `game` に持ち、変更は act() を通して行う（元に戻すのため）。
 // ネット対戦では、描画のたびに自分の公開情報（snapshot）を相手に送り、相手の公開情報を `opp` に受け取る。
 // 手札の中身とライブラリーの順番は送らない（MTGO と同じ公開範囲）。
@@ -85,8 +85,9 @@ function saveJson(store, key, value) {
   } catch {}
 }
 // 名前はタブごと（同じPCの2つのタブで対戦しても混ざらない）→ なければ前回使った名前
+const defaultName = () => (document.documentElement.lang === 'en' ? 'Player' : 'プレイヤー');
 const myName = () => {
-  try { return sessionStorage.getItem(NAME_KEY) || localStorage.getItem(NAME_KEY) || 'プレイヤー'; } catch { return 'プレイヤー'; }
+  try { return sessionStorage.getItem(NAME_KEY) || localStorage.getItem(NAME_KEY) || defaultName(); } catch { return defaultName(); }
 };
 const oppName = () => opp?.name || '相手';
 const online = () => Net.active;
@@ -167,7 +168,7 @@ function cardFrom(card, iid) {
   };
 }
 
-function newGame(deck, onDraw) {
+function newGame(deck, onDraw, random = false) {
   const cards = {};
   const library = [];
   let iid = 0;
@@ -202,7 +203,7 @@ function newGame(deck, onDraw) {
     game.orderFixed = true;
   }
   history = [];
-  log(`「${deck.name}」で開始${game.orderFixed ? `（${game.onDraw ? '後手' : '先手'}）` : ''}`);
+  log(`「${deck.name}」で開始${game.orderFixed ? `（${random ? 'ランダムで' : ''}${game.onDraw ? '後手' : '先手'}）` : ''}`);
   drawCards(7, false);
   render();
   if (Net.connected()) sendHello();
@@ -477,9 +478,25 @@ function moveByUser(iid, to, opts) {
   act(() => moveCard(iid, to, opts));
 }
 
+// スマホ：フェイズの一覧を画面下のシートで出して、押したフェイズまで進める
+function openPhaseMenu() {
+  if (!myTurn()) return;
+  const i = PHASES.findIndex(([id]) => id === game.phase);
+  const items = [];
+  PHASES.forEach(([id, name], j) => {
+    // 対戦中は前のフェイズに戻れない（ターンの終わりを越えると相手にターンが渡るため）
+    if (online() && j < i) return;
+    items.push([`${j === i ? '▶ ' : ''}${name}${j === i ? '（今）' : j < i ? '（次のターン）' : ''}`, () => { if (j !== i) goToPhase(id); }]);
+  });
+  showMenu(items, 0, 0);
+}
+
 function goToPhase(target) {
   if (!myTurn()) return;
   if (target === 'untap') target = 'upkeep'; // アンタップ・ステップは自動で通過する
+  // 対戦中は今より前のフェイズには進めない（ターンの終わりを越えると相手にターンが渡るため）
+  const index = (id) => PHASES.findIndex(([p]) => p === id);
+  if (online() && index(target) <= index(game.phase)) return;
   act(() => {
     let guard = 0;
     do stepPhase(); while (game.phase !== target && ++guard < PHASES.length + 1);
@@ -526,7 +543,7 @@ function render() {
   $('turn-label').textContent = game.turn ? `ターン ${game.turn}` : '初手';
   $('phase-hint').textContent = game.toDiscard > 0
     ? `手札が多すぎます。${game.toDiscard}枚捨ててください。`
-    : game.waiting ? `${oppName()}のターンです。インスタントを唱えたり、能力を起動したりできます。` : PHASE_HINTS[game.phase] ?? '';
+    : game.waiting ? '相手プレイヤーのターンです。インスタントを唱えたり、能力を起動したりできます。' : PHASE_HINTS[game.phase] ?? '';
   $('land-count').textContent = started() ? `土地 ${game.landsPlayed ?? 0}/${LANDS_PER_TURN}` : '';
   $('land-count').classList.toggle('over', (game.landsPlayed ?? 0) > LANDS_PER_TURN);
 
@@ -539,6 +556,8 @@ function render() {
     return b;
   }));
   for (const id of ['next-phase', 'end-turn']) $(id).disabled = !myTurn() || game.toDiscard > 0;
+  $('phase-current').textContent = `${phaseName(game.phase) || '—'} ▼`;
+  $('phase-current').disabled = !myTurn() || game.toDiscard > 0;
   $('undo').disabled = !history.length;
 
   renderBanner();
@@ -629,7 +648,7 @@ function renderBanner() {
     const label = document.createElement('span');
     label.textContent = !game.orderFixed
       ? '相手の接続を待っています（先手・後手は部屋を作った人が決めます）'
-      : game.waiting ? `${oppName()}のターンです` : '相手を待っています';
+      : game.waiting ? '相手プレイヤーのターンです' : '相手を待っています';
     const force = document.createElement('button');
     force.textContent = '自分のターンを始める';
     force.title = '通信が止まったときなどに使います';
@@ -780,6 +799,10 @@ function renderOpp() {
   else label = `${oppName()}：ターン${st.turn}${st.waiting ? '（待機中）' : `・${phaseName(st.phase)}`}`;
   $('opp-status').textContent = label;
   $('opp-area').classList.toggle('active-turn', !!st && st.turn > 0 && !st.waiting);
+  // 部屋を作って相手を待っている間は、部屋コードを大きく出す
+  const waitingGuest = Net.role === 'host' && !opp?.connected;
+  $('room-banner').hidden = !waitingGuest;
+  if (waitingGuest) $('room-code-big').textContent = Net.code;
 }
 
 // 自分の公開情報（手札の中身・ライブラリーの順番は含めない）
@@ -877,6 +900,22 @@ function setupNet() {
     saveJson(sessionStorage, CHAT_KEY, chat.slice(-200));
     renderLog();
   });
+}
+
+// 部屋コードを共有（共有できなければコピー）
+async function shareRoomCode() {
+  const code = Net.code;
+  const text = `Magic: The Gathering System の部屋コード：${code}`;
+  if (navigator.share) {
+    try { await navigator.share({ text }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(code);
+    $('room-share').textContent = 'コピーしました';
+  } catch {
+    $('room-share').textContent = '長押しでコピー';
+  }
+  setTimeout(() => ($('room-share').textContent = '共有・コピー'), 1500);
 }
 
 function sendChat(e) {
@@ -1124,9 +1163,12 @@ function startFromSetup(e) {
   saveJson(sessionStorage, NET_KEY, netInfo);
   if (mode === 'solo') saveJson(sessionStorage, CHAT_KEY, null);
 
-  const onDraw = form.get('order') === 'draw';
+  // 先手・後手：ランダムなら、ここで決める（ネット対戦では部屋を作った側の結果が相手にも伝わる）
+  const order = form.get('order');
+  const random = order === 'random';
+  const onDraw = random ? Math.random() < 0.5 : order === 'draw';
   $('setup').close();
-  newGame(deck, onDraw);
+  newGame(deck, onDraw, random && mode !== 'join');
 }
 
 // ---------- 初期化 ----------
@@ -1203,6 +1245,8 @@ function init() {
   $('setup-form').addEventListener('submit', startFromSetup);
   for (const r of $('setup-form').elements.mode) r.addEventListener('change', updateSetupMode);
   $('chat-form').addEventListener('submit', sendChat);
+  $('room-share').addEventListener('click', shareRoomCode);
+  $('phase-current').addEventListener('click', openPhaseMenu);
   $('opp-pile-graveyard').addEventListener('click', () => openOppViewer('graveyard'));
   $('opp-pile-exile').addEventListener('click', () => openOppViewer('exile'));
 

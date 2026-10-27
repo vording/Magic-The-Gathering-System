@@ -1,4 +1,4 @@
-// MTG Deck Maker — Scryfall API を使ったフォーマット別デッキ作成ツール
+// Magic: The Gathering System — Scryfall API を使ったフォーマット別デッキ作成ツール
 
 // ---------- 非公式フォーマットの定義 ----------
 // Scryfall に判定がないフォーマットは、使用可能セット・禁止・制限をここで定義する。
@@ -67,6 +67,8 @@ const JA_POOL_LIMIT = 100;
 const MAX_QUERY_LENGTH = 950;
 
 const $ = (id) => document.getElementById(id);
+// 保存するデータ（デッキ名など）を作るときは、今の表示言語で名前を付ける
+const L = (ja, en) => (document.documentElement.lang === 'en' ? en : ja);
 
 let state = loadState();
 let nextPage = null;
@@ -83,9 +85,9 @@ function loadState() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved?.decks?.length) return { ja: true, oldest: true, ...saved };
     // 旧形式（デッキ1つ）からの移行
-    if (saved?.deck) return { ja: saved.ja ?? true, oldest: true, current: 1, decks: [newDeck(1, 'デッキ1', saved.format, saved.deck)] };
+    if (saved?.deck) return { ja: saved.ja ?? true, oldest: true, current: 1, decks: [newDeck(1, L('デッキ1', 'Deck 1'), saved.format, saved.deck)] };
   } catch {}
-  return { ja: true, oldest: true, current: 1, decks: [newDeck(1, 'デッキ1')] };
+  return { ja: true, oldest: true, current: 1, decks: [newDeck(1, L('デッキ1', 'Deck 1'))] };
 }
 
 function saveState() {
@@ -506,9 +508,9 @@ function switchDeck(id) {
 }
 
 function createDeck() {
-  const name = prompt('新しいデッキの名前', `デッキ${nextDeckId()}`);
+  const name = prompt('新しいデッキの名前', L(`デッキ${nextDeckId()}`, `Deck ${nextDeckId()}`));
   if (name === null) return;
-  const deck = newDeck(nextDeckId(), name.trim() || `デッキ${nextDeckId()}`, activeDeck().format);
+  const deck = newDeck(nextDeckId(), name.trim() || L(`デッキ${nextDeckId()}`, `Deck ${nextDeckId()}`), activeDeck().format);
   state.decks.push(deck);
   switchDeck(deck.id);
 }
@@ -524,7 +526,7 @@ function renameDeck() {
 
 function copyDeck() {
   const src = activeDeck();
-  const deck = newDeck(nextDeckId(), `${src.name}のコピー`, src.format, structuredClone(src.cards));
+  const deck = newDeck(nextDeckId(), L(`${src.name}のコピー`, `Copy of ${src.name}`), src.format, structuredClone(src.cards));
   state.decks.push(deck);
   switchDeck(deck.id);
 }
@@ -533,7 +535,7 @@ function deleteDeck() {
   const deck = activeDeck();
   if (!confirm(`「${deck.name}」を削除しますか？`)) return;
   state.decks = state.decks.filter((d) => d !== deck);
-  if (!state.decks.length) state.decks.push(newDeck(1, 'デッキ1', deck.format));
+  if (!state.decks.length) state.decks.push(newDeck(1, L('デッキ1', 'Deck 1'), deck.format));
   switchDeck(state.decks[0].id);
 }
 
@@ -576,14 +578,49 @@ async function copyExport(button, lang) {
     persistJa();
   }
   const text = exportText(lang);
+  button.disabled = false;
+  // スマホは全文を表示する画面から「コピー」「共有」する（ボタンを押してから時間がたつとコピーが許可されないため）
+  if (window.isPhone?.()) {
+    button.textContent = label;
+    showExport(text, lang);
+    return;
+  }
   try {
     await navigator.clipboard.writeText(text);
     button.textContent = 'コピーしました';
+    setTimeout(() => (button.textContent = label), 1500);
   } catch {
-    prompt('デッキリスト', text);
+    button.textContent = label;
+    showExport(text, lang);
   }
-  button.disabled = false;
-  setTimeout(() => (button.textContent = label), 1500);
+}
+
+function showExport(text, lang) {
+  $('export-title').textContent = `デッキリスト（${lang === 'ja' ? '日本語' : '英語'}）`;
+  $('export-text').value = text;
+  $('export-status').textContent = '';
+  $('export-share').hidden = !navigator.share;
+  $('export-dialog').showModal();
+}
+
+async function copyFromDialog() {
+  const box = $('export-text');
+  const status = (t) => ($('export-status').textContent = t);
+  try {
+    await navigator.clipboard.writeText(box.value);
+    status('コピーしました');
+    return;
+  } catch {}
+  // クリップボードの機能が使えないブラウザ向け
+  box.focus();
+  box.setSelectionRange(0, box.value.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch {}
+  status(ok ? 'コピーしました' : 'コピーできませんでした。テキストを長押しして「すべてを選択」→「コピー」してください');
+}
+
+function shareExport() {
+  navigator.share?.({ title: activeDeck().name, text: $('export-text').value }).catch(() => {});
 }
 
 // ---------- インポート ----------
@@ -733,7 +770,7 @@ async function runImport(e) {
       $('import-run').disabled = false;
       return;
     }
-    const name = $('import-name').value.trim() || parsed.name || `インポート${nextDeckId()}`;
+    const name = $('import-name').value.trim() || parsed.name || L(`インポート${nextDeckId()}`, `Import ${nextDeckId()}`);
     const deck = newDeck(nextDeckId(), name, activeDeck().format, cards);
     state.decks.push(deck);
     switchDeck(deck.id);
@@ -946,6 +983,9 @@ function init() {
   $('import').addEventListener('click', openImport);
   $('import-form').addEventListener('submit', runImport);
   $('import-cancel').addEventListener('click', () => $('import-dialog').close());
+  $('export-copy').addEventListener('click', copyFromDialog);
+  $('export-share').addEventListener('click', shareExport);
+  $('export-close').addEventListener('click', () => $('export-dialog').close());
 
   $('clear').addEventListener('click', () => {
     if (!deckTotal() || confirm('デッキを空にしますか？')) {

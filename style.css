@@ -196,3 +196,5 @@ html.phone .art-list { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr
 .import-name input { flex: 1; }
 .import-status { white-space: pre-line; min-height: 1.4em; }
 html.phone .import-dialog textarea { font-size: 16px; min-height: 180px; }
+html.phone .io-actions button { padding: 0 2px; font-size: 13px; white-space: nowrap; }
+html.phone #export-text { font-size: 16px; }
