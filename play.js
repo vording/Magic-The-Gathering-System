@@ -41,9 +41,9 @@ const PHASE_HINTS = {
   untap: 'アンタップ・ステップ。',
   upkeep: 'アップキープ・ステップ。インスタントを唱えたり、能力を起動したりできます。',
   draw: 'ドロー・ステップ。インスタントを唱えたり、能力を起動したりできます。',
-  main1: '第1メイン・フェイズ。土地をプレイしたり、呪文を唱えたりできます。',
+  main1: '第1メイン・フェイズ。土地をプレイしたり、呪文を唱えたりできます。クリーチャーをクリックすると攻撃に進みます。',
   begincombat: '戦闘開始ステップ。',
-  attack: '攻撃クリーチャー指定ステップ。攻撃するクリーチャーをクリックしてください。',
+  attack: '攻撃クリーチャー指定ステップ。攻撃するクリーチャーをクリックして「攻撃を確定」を押してください。',
   block: 'ブロック・クリーチャー指定ステップ。',
   damage: '戦闘ダメージ・ステップ。',
   endcombat: '戦闘終了ステップ。',
@@ -658,25 +658,32 @@ function forceMyTurn() {
 
 // 攻撃ステップでクリーチャーをクリック：タップして攻撃（もう一度クリックで取り消し）
 function toggleAttack(iid, { vigilance = false } = {}) {
-  act(() => {
-    const c = game.cards[iid];
-    if (c.attacking) {
-      c.attacking = false;
-      if (!c.vigilance) c.tapped = false;
-      c.vigilance = false;
-      Sound.play('cancel');
-      log(`${c.name}の攻撃を取り消し`);
-      return;
-    }
-    // 警戒を持つクリーチャーはタップしない
-    const vig = vigilance || hasKw(c, 'vigilance');
-    c.attacking = true;
-    c.vigilance = vig;
-    if (!vig) c.tapped = true;
-    Sound.play('attack');
-    log(`${c.name}で攻撃${vig ? '（タップしない）' : ''}`);
-  });
+  act(() => attackToggle(iid, vigilance));
 }
+
+// 攻撃の指定・取り消し（act の中で呼ぶ）
+function attackToggle(iid, vigilance = false) {
+  const c = game.cards[iid];
+  if (c.attacking) {
+    c.attacking = false;
+    if (!c.vigilance) c.tapped = false;
+    c.vigilance = false;
+    Sound.play('cancel');
+    log(`${c.name}の攻撃を取り消し`);
+    return;
+  }
+  // 警戒を持つクリーチャーはタップしない
+  const vig = vigilance || hasKw(c, 'vigilance');
+  c.attacking = true;
+  c.vigilance = vig;
+  if (!vig) c.tapped = true;
+  Sound.play('attack');
+  log(`${c.name}で攻撃${vig ? '（タップしない）' : ''}`);
+}
+
+// メイン1で押したら攻撃に進むクリーチャーか。{T} の能力（マナ能力など）を持つものは今までどおりタップする
+const attacksOnClick = (c) => game.phase === 'main1' && myTurn() && !c.isLand && c.isCreature !== false
+  && !c.tapped && !isSick(c) && !/\{T\}/.test(c.text ?? '');
 
 const canAttack = (c) => game.phase === 'attack' && myTurn() && !c.isLand && c.isCreature !== false
   && (c.attacking || (!c.tapped && !isSick(c)));
@@ -687,6 +694,7 @@ function onBattlefieldClick(iid) {
   if (game.phase === 'attack' && myTurn() && c.isCreature && !c.isLand && !c.attacking && !c.tapped && isSick(c)) {
     return showToast(`${c.name}はこのターンに出たので攻撃できません（召喚酔い）`);
   }
+  if (attacksOnClick(c)) return attackFromMain(iid);
   if (canAttack(c)) toggleAttack(iid);
   else toggleTap(iid);
 }
@@ -765,20 +773,58 @@ function goToPhase(target) {
   doGoToPhase(target);
 }
 
-function doGoToPhase(target) {
+// then: 目的のフェイズに着いた後に続けて行う操作（メイン1でクリーチャーを押して攻撃するときなど）
+function doGoToPhase(target, then = null) {
   act(() => {
     let guard = 0;
     // 戦闘ダメージ・ステップに攻撃クリーチャーがいれば、そこで止めてダメージを計算する
     do stepPhase(); while (game.phase !== target && !game.combatPending && ++guard < PHASES.length + 1);
+    // ダメージの計算で止まったら、計算の後に目的のフェイズまで続けて進む（承認は済んでいる）
+    game.resumeTarget = game.combatPending && game.phase !== target ? target : null;
+    if (game.phase === target) then?.();
   });
 }
 
-function nextPhase() {
-  if (!myTurn()) return;
-  if (needsApproval() && !(game.toDiscard > 0)) {
-    return requestAdvance(PHASES[PHASES.findIndex(([id]) => id === game.phase) + 1][0]);
+// 戦闘ダメージの「適用」「適用しない」の後、止まる前に向かっていたフェイズへ進む
+function resumeAfterCombat() {
+  const target = game.resumeTarget;
+  game.resumeTarget = null;
+  if (target && myTurn()) doGoToPhase(target);
+}
+
+const canAnyAttack = () => game.zones.battlefield.some((i) => {
+  const c = game.cards[i];
+  return !c.isLand && c.isCreature !== false && !c.tapped && !isSick(c);
+});
+
+// 「次へ」のボタンが今のフェイズで行うこと。何も起きないステップ（戦闘開始・ブロック・戦闘終了など）は飛ばす
+// メイン2・終了・クリーンアップでは null（「ターン終了」で進む）
+function nextStop() {
+  const anyAttacking = game.zones.battlefield.some((i) => game.cards[i].attacking);
+  switch (game.phase) {
+    case 'upkeep':
+    case 'draw': return { label: 'メイン1へ', to: 'main1' };
+    case 'main1': return canAnyAttack() ? { label: '戦闘へ', to: 'attack' } : { label: 'メイン2へ', to: 'main2' };
+    case 'begincombat': return { label: '攻撃へ', to: 'attack' };
+    case 'attack': return { label: anyAttacking ? '攻撃を確定' : '攻撃しない', to: 'main2' };
+    case 'block':
+    case 'damage':
+    case 'endcombat': return { label: 'メイン2へ', to: 'main2' };
+    default: return null;
   }
-  act(stepPhase);
+}
+
+function nextPhase() {
+  if (!myTurn() || game.toDiscard > 0) return;
+  const stop = nextStop();
+  if (stop) goToPhase(stop.to);
+  else endTurn();
+}
+
+// メイン1で攻撃できるクリーチャーを押したら、攻撃ステップへ進んでそのまま攻撃する
+function attackFromMain(iid) {
+  if (needsApproval()) return requestAdvance('attack', false, iid);
+  doGoToPhase('attack', () => attackToggle(iid));
 }
 
 function endTurn() {
@@ -804,9 +850,10 @@ function doEndTurn() {
 
 const needsApproval = () => online() && Net.connected() && myTurn() && PRIORITY_PHASES.has(game.phase);
 
-function requestAdvance(to, end = false) {
+// attack: 進んだ後に攻撃させるクリーチャー（メイン1でクリーチャーを押したとき）
+function requestAdvance(to, end = false, attack = null) {
   if (outgoing) return;
-  outgoing = { id: Math.random().toString(36).slice(2), from: game.phase, to, end, held: false };
+  outgoing = { id: Math.random().toString(36).slice(2), from: game.phase, to, end, held: false, attack };
   Net.send({ type: 'priority', id: outgoing.id, from: outgoing.from, to, end });
   render();
 }
@@ -825,7 +872,7 @@ function onApproved(id) {
   // 待っている間にフェイズが変わっていたら（手動で進めたなど）何もしない
   if (!myTurn() || game.phase !== req.from) return render();
   if (req.end) doEndTurn();
-  else doGoToPhase(req.to);
+  else doGoToPhase(req.to, req.attack != null ? () => attackToggle(req.attack) : null);
 }
 
 function receiveRequest(msg) {
@@ -837,6 +884,8 @@ function receiveRequest(msg) {
 
 function approveRequest() {
   if (!incoming) return;
+  // 直前に指定したブロックが OK より先に相手へ届くよう、今の状態をすぐ送る
+  if (game) Net.send({ type: 'state', state: snapshot() });
   Net.send({ type: 'priorityOk', id: incoming.id });
   incoming = null;
   render();
@@ -974,6 +1023,7 @@ function applyCombat() {
       game.dealt = (game.dealt ?? 0) + r.toOpp;
     }
   });
+  resumeAfterCombat();
 }
 
 function skipCombat() {
@@ -981,6 +1031,7 @@ function skipCombat() {
   $('combat').close();
   game.combatPending = false;
   render();
+  resumeAfterCombat();
 }
 
 // 相手の戦闘ダメージを受け取る（自分のライフ・クリーチャーに反映）
@@ -1078,6 +1129,10 @@ function render() {
   }));
   const canAdvance = myTurn() && !(game.toDiscard > 0) && !outgoing;
   for (const id of ['next-phase', 'end-turn']) $(id).disabled = !canAdvance;
+  // 「次へ」は今のフェイズでやること（戦闘へ・攻撃を確定など）を表示。メイン2以降は「ターン終了」だけ
+  const stop = myTurn() ? nextStop() : null;
+  $('next-phase').textContent = stop?.label ?? '次へ';
+  $('next-phase').hidden = myTurn() && !stop;
   $('phase-current').textContent = `${phaseName(game.phase) || '—'} ▼`;
   $('phase-current').dataset.phase = game.phase;
   $('phase-current').disabled = !canAdvance;
@@ -1293,7 +1348,7 @@ function cardEl(iid, zone) {
     // スマホ：タップでカードの拡大とメニュー（「戦場へ」など）
     el.addEventListener('click', (e) => { if (phone()) openCardMenu(iid, e.clientX, e.clientY); });
   } else if (zone === 'battlefield') {
-    if (canAttack(c)) el.classList.add('can-attack');
+    if (canAttack(c) || attacksOnClick(c)) el.classList.add('can-attack');
     el.addEventListener('click', () => onBattlefieldClick(iid));
   } else {
     el.addEventListener('click', (e) => openCardMenu(iid, e.clientX, e.clientY));

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>一人回し・対戦 — Magic: The Gathering System</title>
   <link rel="stylesheet" href="theme.css?v=24">
-  <link rel="stylesheet" href="play.css?v=39">
-  <script src="i18n.js?v=14"></script>
+  <link rel="stylesheet" href="play.css?v=41">
+  <script src="i18n.js?v=15"></script>
   <script src="device.js?v=1"></script>
   <script src="felt.js?v=7"></script>
   <script src="zoom.js?v=2"></script>
@@ -56,22 +56,22 @@
           <div class="life"><span id="opp-life" class="opp-life"></span></div>
           <div class="piles">
             <div class="pile static" title="ライブラリーの枚数">
-              <span class="pile-icon icon-library" aria-hidden="true">▤</span>
+              <span class="pile-icon icon-library" aria-hidden="true"></span>
               <span class="pile-count" id="opp-library-count"></span>
               <span class="pile-name">ライブラリー</span>
             </div>
             <div class="pile static" title="手札の枚数">
-              <span class="pile-icon icon-hand" aria-hidden="true">✋</span>
+              <span class="pile-icon icon-hand" aria-hidden="true"></span>
               <span class="pile-count" id="opp-hand-count"></span>
               <span class="pile-name">手札</span>
             </div>
             <div class="pile" id="opp-pile-graveyard" title="墓地：クリックで一覧">
-              <span class="pile-icon icon-graveyard" aria-hidden="true">✝</span>
+              <span class="pile-icon icon-graveyard" aria-hidden="true"></span>
               <span class="pile-count" id="opp-graveyard-count"></span>
               <span class="pile-name">墓地</span>
             </div>
             <div class="pile" id="opp-pile-exile" title="追放：クリックで一覧">
-              <span class="pile-icon icon-exile" aria-hidden="true">◌</span>
+              <span class="pile-icon icon-exile" aria-hidden="true"></span>
               <span class="pile-count" id="opp-exile-count"></span>
               <span class="pile-name">追放</span>
             </div>
@@ -89,17 +89,17 @@
         </div>
         <div class="piles">
           <div class="pile library" id="pile-library" data-zone="library" title="ライブラリー：クリックで1枚引く／右クリックでメニュー">
-            <span class="pile-icon icon-library" aria-hidden="true">▤</span>
+            <span class="pile-icon icon-library" aria-hidden="true"></span>
             <span class="pile-count" id="library-count"></span>
             <span class="pile-name">ライブラリー</span>
           </div>
           <div class="pile" id="pile-graveyard" data-zone="graveyard" title="墓地：クリックで一覧">
-            <span class="pile-icon icon-graveyard" aria-hidden="true">✝</span>
+            <span class="pile-icon icon-graveyard" aria-hidden="true"></span>
             <span class="pile-count" id="graveyard-count"></span>
             <span class="pile-name">墓地</span>
           </div>
           <div class="pile" id="pile-exile" data-zone="exile" title="追放：クリックで一覧">
-            <span class="pile-icon icon-exile" aria-hidden="true">◌</span>
+            <span class="pile-icon icon-exile" aria-hidden="true"></span>
             <span class="pile-count" id="exile-count"></span>
             <span class="pile-name">追放</span>
           </div>
@@ -259,6 +259,6 @@
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <script src="sound.js?v=2"></script>
   <script src="net.js?v=2"></script>
-  <script src="play.js?v=23"></script>
+  <script src="play.js?v=24"></script>
 </body>
 </html>

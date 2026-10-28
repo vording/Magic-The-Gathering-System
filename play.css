@@ -89,6 +89,8 @@ body { user-select: none; }
 [data-phase="cleanup"] { --phase-icon: url("img/phase/cleanup.png"); }
 
 .phase-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+/* メイン2以降は「次へ」を隠すので、「ターン終了」を横いっぱいにする */
+.phase-actions #next-phase[hidden] + #end-turn { grid-column: 1 / -1; }
 
 /* ---------- プレイヤー列：アバター・ライフ・山札 ---------- */
 
@@ -165,7 +167,7 @@ body { user-select: none; }
   border-radius: 50%;
   box-shadow: 0 0 0 1px #686868;
 }
-.pile-icon.icon-library, .pile-icon.icon-hand, .pile-icon.icon-graveyard, .pile-icon.icon-exile { font-size: 0; background: center / cover no-repeat; }
+.pile-icon.icon-library, .pile-icon.icon-hand, .pile-icon.icon-graveyard, .pile-icon.icon-exile { background: center / cover no-repeat; }
 .pile-icon.icon-exile { background-image: url("img/icon/exile.png"); }
 .pile-icon.icon-library { background-image: url("img/icon/library.png"); }
 .pile-icon.icon-hand { background-image: url("img/icon/hand.png"); }
