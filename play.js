@@ -11,6 +11,10 @@ const LANDS_PER_TURN = 1;
 const NET_KEY = 'mtg-deckmaker-net';
 const CHAT_KEY = 'mtg-deckmaker-chat';
 const NAME_KEY = 'mtg-deckmaker-name';
+const AVATAR_KEY = 'mtg-deckmaker-avatar';
+// アバター（img/avatar/1.jpg〜18.jpg）
+const AVATARS = Array.from({ length: 18 }, (_, i) => String(i + 1));
+const avatarImage = (a) => `url("img/avatar/${a}.jpg")`;
 const PHASE_NAMES = {
   mulligan: 'マリガン', keep: 'マリガン', ready: '開始待ち',
 };
@@ -27,7 +31,7 @@ const PHASES = [
   ['endcombat', '戦闘終了'],
   ['main2', 'メイン2'],
   ['end', '終了'],
-  ['cleanup', 'クリンナップ'],
+  ['cleanup', 'クリーンアップ'],
 ];
 
 const PHASE_HINTS = {
@@ -45,10 +49,10 @@ const PHASE_HINTS = {
   endcombat: '戦闘終了ステップ。',
   main2: '第2メイン・フェイズ。土地をプレイしたり、呪文を唱えたりできます。',
   end: '終了ステップ。インスタントを唱えたり、能力を起動したりできます。',
-  cleanup: 'クリンナップ・ステップ。',
+  cleanup: 'クリーンアップ・ステップ。',
 };
 
-// ネット対戦で、終えるときに相手の承認が必要なステップ（アンタップ・クリンナップでは呪文を唱えられない）
+// ネット対戦で、終えるときに相手の承認が必要なステップ（アンタップ・クリーンアップでは呪文を唱えられない）
 const PRIORITY_PHASES = new Set(['upkeep', 'draw', 'main1', 'begincombat', 'attack', 'block', 'damage', 'endcombat', 'main2', 'end']);
 const AUTOPASS_KEY = 'mtg-deckmaker-autopass';
 
@@ -102,12 +106,91 @@ function saveJson(store, key, value) {
     else store.setItem(key, JSON.stringify(value));
   } catch {}
 }
-// 名前はタブごと（同じPCの2つのタブで対戦しても混ざらない）→ なければ前回使った名前
-const defaultName = () => (document.documentElement.lang === 'en' ? 'Player' : 'プレイヤー');
+// ランダムな名前：ファンタジー風（「紅蓮の魔導士」）が8割、ゆるい名前（「はらぺこゴブリン」）が2割
+const NAME_WORDS = {
+  ja: {
+    fantasy: [
+      ['紅蓮', '蒼穹', '深淵', '黄昏', '静寂', '灼熱', '氷結', '放浪', '不屈', '月影', '嵐', '黒曜', '白銀', '翠緑', '暁', '星詠み'],
+      ['魔導士', '騎士', '竜騎士', '守り手', '預言者', '死霊術士', '錬金術師', '吟遊詩人', '狩人', '賢者', '魔女', '剣士', '召喚士', '盗賊', '巫女', '王'],
+    ],
+    light: [
+      ['はらぺこ', 'ねぼすけ', 'おでかけ', 'ごきげん', 'のんびり', 'うっかり', 'ほろよい', 'ぽんこつ', 'ひるね中の', 'まいごの'],
+      ['ゴブリン', 'ドラゴン', 'スライム', 'ゾンビ', 'エルフ', 'ドワーフ', 'リッチ', 'ウーズ', 'スフィンクス', 'マーフォーク'],
+    ],
+  },
+  en: {
+    fantasy: [
+      ['Crimson', 'Azure', 'Abyssal', 'Twilight', 'Silent', 'Blazing', 'Frozen', 'Wandering', 'Ancient', 'Silver', 'Shadow', 'Storm', 'Emerald', 'Obsidian'],
+      ['Mage', 'Knight', 'Seer', 'Warden', 'Alchemist', 'Bard', 'Hunter', 'Sage', 'Witch', 'Duelist', 'Summoner', 'Rogue', 'Oracle', 'Paladin', 'Necromancer'],
+    ],
+    light: [
+      ['Hungry', 'Sleepy', 'Clumsy', 'Grumpy', 'Tipsy', 'Lost', 'Cheerful', 'Lazy', 'Giggly', 'Snoozy'],
+      ['Goblin', 'Dragon', 'Slime', 'Zombie', 'Elf', 'Dwarf', 'Lich', 'Ooze', 'Sphinx', 'Merfolk'],
+    ],
+  },
+};
+const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+function randomName() {
+  const en = document.documentElement.lang === 'en';
+  const words = NAME_WORDS[en ? 'en' : 'ja'];
+  const fantasy = Math.random() < 0.8;
+  const [first, second] = fantasy ? words.fantasy : words.light;
+  // 名前は16文字まで（長すぎる組み合わせは引き直す）
+  for (;;) {
+    const a = pick(first);
+    const b = pick(second);
+    const name = en ? `${a} ${b}` : fantasy ? `${a}の${b}` : `${a}${b}`;
+    if (name.length <= 16) return name;
+  }
+}
+
+// 名前はタブごと（同じPCの2つのタブで対戦しても混ざらない）→ なければ前回使った名前 → なければランダム
+// 以前の既定の名前（プレイヤー / Player）は入力されていないものとして扱う
+let generatedName = null;
 const myName = () => {
-  try { return sessionStorage.getItem(NAME_KEY) || localStorage.getItem(NAME_KEY) || defaultName(); } catch { return defaultName(); }
+  let saved = null;
+  try { saved = sessionStorage.getItem(NAME_KEY) || localStorage.getItem(NAME_KEY); } catch {}
+  if (saved && saved !== 'プレイヤー' && saved !== 'Player') return saved;
+  if (!generatedName) {
+    generatedName = randomName();
+    try { localStorage.setItem(NAME_KEY, generatedName); } catch {}
+  }
+  return generatedName;
 };
 const oppName = () => opp?.name || '相手';
+const validAvatar = (a) => (AVATARS.includes(String(a)) ? String(a) : AVATARS[0]);
+// 名前と同じく、タブごと → なければ前回使ったアバター
+const myAvatar = () => {
+  try { return validAvatar(sessionStorage.getItem(AVATAR_KEY) || localStorage.getItem(AVATAR_KEY)); } catch { return AVATARS[0]; }
+};
+
+function setAvatar(a) {
+  try {
+    sessionStorage.setItem(AVATAR_KEY, validAvatar(a));
+    localStorage.setItem(AVATAR_KEY, validAvatar(a));
+  } catch {}
+  renderAvatars();
+  if (Net.connected()) sendHello();
+}
+
+function renderAvatars() {
+  $('my-avatar').style.backgroundImage = avatarImage(myAvatar());
+  $('opp-avatar').style.backgroundImage = avatarImage(validAvatar(opp?.avatar));
+}
+
+// 開始画面のアバター選択
+function buildAvatarChoices() {
+  $('avatar-choices').replaceChildren(...AVATARS.map((a) => {
+    const label = document.createElement('label');
+    const input = Object.assign(document.createElement('input'), { type: 'radio', name: 'avatar', value: a });
+    const face = document.createElement('span');
+    face.className = 'avatar';
+    face.style.backgroundImage = avatarImage(a);
+    label.append(input, face);
+    return label;
+  }));
+}
 const online = () => Net.active;
 
 // ---------- スマホ（タッチ操作） ----------
@@ -152,9 +235,55 @@ function cardFrom(card, iid) {
     isCreature: /\bCreature\b/.test(card.typeLine ?? ''),
     kind: cardKind(card.typeLine),
     mana: manaColors(card),
+    typeLine: card.typeLine ?? '',
+    text: (useJa && card.ja?.text) || card.oracleText || '',
+    power: card.power ?? null,
+    toughness: card.toughness ?? null,
+    keywords: (card.keywords ?? []).map((k) => k.toLowerCase()),
     tapped: false,
     counters: 0,
   };
+}
+
+// ---------- パワー／タフネス・キーワード能力 ----------
+
+const hasKw = (c, k) => (c.keywords ?? []).includes(k);
+const toNum = (v) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) ? n : 0; };
+
+// 今のパワー／タフネス（カウンターは +1/+1 カウンターとして数え、「このターン」の修整も足す）。P/T のないカードは null
+function ptOf(c) {
+  if (c.power == null || c.toughness == null) return null;
+  const m = c.ptMod ?? { p: 0, t: 0 };
+  return { p: toNum(c.power) + (c.counters || 0) + m.p, t: toNum(c.toughness) + (c.counters || 0) + m.t };
+}
+const ptText = (c) => { const pt = ptOf(c); return pt ? `${pt.p}/${pt.t}` : ''; };
+
+// 召喚酔い：このターン（自分のターン数で数える）に戦場に出たクリーチャーは、速攻がなければ攻撃できない
+const isSick = (c) => !!c.isCreature && c.enteredTurn != null && c.enteredTurn >= game.turn && !hasKw(c, 'haste');
+
+// 拡大表示用（タイプ・効果テキスト・P/T）
+const detailOf = (c) => ({ name: c.name, image: c.image, text: [c.typeLine, c.text, ptText(c)].filter(Boolean).join('\n') });
+
+// ターンの終わり：「このターン」の修整と負ったダメージがなくなる
+function endOfTurn() {
+  for (const iid of game.zones.battlefield) {
+    delete game.cards[iid].ptMod;
+    delete game.cards[iid].damage;
+  }
+}
+
+// 短いお知らせ（数秒で消える）
+function showToast(text) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = Object.assign(document.createElement('div'), { id: 'toast', className: 'toast' });
+    document.body.append(el);
+  }
+  el.textContent = text;
+  el.hidden = false;
+  Sound.play('cancel');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => { el.hidden = true; }, 2500);
 }
 
 // 効果音を選ぶためのカードの種類（表面のタイプ行で判定）
@@ -290,6 +419,11 @@ function moveCard(iid, to, { bottom = false, silent = false } = {}) {
     card.tapped = false;
     card.counters = 0;
     card.attacking = false;
+    delete card.ptMod;
+    delete card.damage;
+    if (game.blocks) delete game.blocks[iid];
+  } else if (from !== 'battlefield') {
+    card.enteredTurn = game.turn;
   }
   if (card.isLand && from === 'hand' && to === 'battlefield' && started()) game.landsPlayed = (game.landsPlayed ?? 0) + 1;
   if (to === 'library' && !bottom) game.zones.library.unshift(iid);
@@ -332,6 +466,7 @@ function startTurnOne() {
 function beginTurn() {
   // 一人回しは自分のターンの終わり、ネット対戦は相手からターンが回ってきたとき
   Sound.play(online() ? 'myturn' : 'endturn');
+  endOfTurn(); // 一人回しは自分の前のターン、ネット対戦は相手のターンが終わったところ
   game.turn++;
   game.landsPlayed = 0;
   game.pendingEndTurn = false;
@@ -348,11 +483,13 @@ function stepPhase() {
   Sound.play('phase');
   game.phase = PHASES[i + 1][0];
   if (game.phase === 'draw') drawCards(1);
+  // 戦闘ダメージ・ステップ：攻撃しているクリーチャーがいれば、ダメージの計算を出す（render で開く）
+  if (game.phase === 'damage' && game.zones.battlefield.some((iid) => game.cards[iid].attacking)) game.combatPending = true;
   if (game.phase === 'endcombat') clearAttackers();
   if (game.phase === 'cleanup') checkHandSize();
 }
 
-// クリンナップ・ステップ：手札が上限を超えていたら捨てるカードを選ばせる
+// クリーンアップ・ステップ：手札が上限を超えていたら捨てるカードを選ばせる
 function checkHandSize() {
   const over = game.zones.hand.length - MAX_HAND;
   game.toDiscard = Math.max(0, over);
@@ -363,9 +500,16 @@ function clearAttackers() {
   for (const iid of game.zones.battlefield) game.cards[iid].attacking = false;
 }
 
-function createToken(name, image = null) {
+// src があればそのカードのコピー。なければ名前の「1/1」などを P/T として使う
+function createToken(name, image = null, src = null) {
   const iid = game.nextIid++;
-  game.cards[iid] = { iid, name, image, isLand: false, isCreature: true, tapped: false, counters: 0, token: true };
+  const pt = !src && name.match(/(\d+)\s*\/\s*(\d+)/);
+  game.cards[iid] = {
+    iid, name, image, isLand: false, isCreature: src ? src.isCreature !== false : true, tapped: false, counters: 0, token: true,
+    typeLine: src?.typeLine ?? '', text: src?.text ?? '', keywords: src?.keywords ?? [],
+    power: src ? src.power : pt ? pt[1] : null, toughness: src ? src.toughness : pt ? pt[2] : null,
+    enteredTurn: game.turn,
+  };
   game.zones.battlefield.push(iid);
   Sound.play('summon');
   log(`${name}（トークン）を生成`);
@@ -457,6 +601,7 @@ function passTurn() {
   game.phase = 'cleanup';
   game.pendingEndTurn = false;
   clearAttackers();
+  endOfTurn();
   game.waiting = true;
   outgoing = null;
   Sound.play('endturn');
@@ -523,23 +668,73 @@ function toggleAttack(iid, { vigilance = false } = {}) {
       log(`${c.name}の攻撃を取り消し`);
       return;
     }
+    // 警戒を持つクリーチャーはタップしない
+    const vig = vigilance || hasKw(c, 'vigilance');
     c.attacking = true;
-    c.vigilance = vigilance;
-    if (!vigilance) c.tapped = true;
+    c.vigilance = vig;
+    if (!vig) c.tapped = true;
     Sound.play('attack');
-    log(`${c.name}で攻撃${vigilance ? '（タップしない）' : ''}`);
+    log(`${c.name}で攻撃${vig ? '（タップしない）' : ''}`);
   });
 }
 
-const canAttack = (c) => game.phase === 'attack' && !c.isLand && c.isCreature !== false && (c.attacking || !c.tapped);
+const canAttack = (c) => game.phase === 'attack' && myTurn() && !c.isLand && c.isCreature !== false
+  && (c.attacking || (!c.tapped && !isSick(c)));
 
 function onBattlefieldClick(iid) {
-  if (canAttack(game.cards[iid])) toggleAttack(iid);
+  const c = game.cards[iid];
+  if (canBlockNow() && c.isCreature && !c.isLand) return onBlockerClick(iid);
+  if (game.phase === 'attack' && myTurn() && c.isCreature && !c.isLand && !c.attacking && !c.tapped && isSick(c)) {
+    return showToast(`${c.name}はこのターンに出たので攻撃できません（召喚酔い）`);
+  }
+  if (canAttack(c)) toggleAttack(iid);
   else toggleTap(iid);
 }
 
+// ---------- ブロック（ネット対戦で相手のターン） ----------
+// 自分のクリーチャー → 相手の攻撃クリーチャーの順にクリックしてブロックを指定する
+
+let blockSel = null; // 選択中の自分のクリーチャー
+const oppAttackers = () => (opp?.state?.battlefield ?? []).filter((c) => c.attacking);
+// 後手は相手の1ターン目の間まだ自分のターン0なので、キープ済み（開始待ち）でもブロックできる
+const canBlockNow = () => online() && (started() || game.phase === 'ready') && game.waiting
+  && ['attack', 'block'].includes(opp?.state?.phase) && oppAttackers().length > 0;
+
+function onBlockerClick(iid) {
+  const c = game.cards[iid];
+  if (game.blocks?.[iid] != null) {
+    act(() => {
+      delete game.blocks[iid];
+      log(`${c.name}のブロックを取り消し`);
+    });
+    return;
+  }
+  if (c.tapped) return showToast('タップしているクリーチャーはブロックできません');
+  blockSel = blockSel === iid ? null : iid;
+  render();
+}
+
+function blockAttacker(a) {
+  const c = game.cards[blockSel];
+  if (!c || zoneOf(blockSel) !== 'battlefield') { blockSel = null; return; }
+  if (hasKw(a, 'flying') && !hasKw(c, 'flying') && !hasKw(c, 'reach')) {
+    return showToast(`${a.name}は飛行を持っています。飛行か到達がないとブロックできません`);
+  }
+  const iid = blockSel;
+  blockSel = null;
+  act(() => {
+    game.blocks = { ...game.blocks, [iid]: a.iid };
+    Sound.play('button');
+    log(`${c.name}で${a.name}をブロック`);
+  });
+}
+
+// マリガン中（1ターン目が始まる前）はカードを動かしたり引いたりできない
+const canPlay = () => !!game && game.turn > 0;
+
 // 手からの土地は1ターン1枚まで（超える場合は確認してから出す）
 function moveByUser(iid, to, opts) {
+  if (!canPlay()) return;
   const c = game.cards[iid];
   if (c.isLand && to === 'battlefield' && zoneOf(iid) === 'hand' && started()
       && (game.landsPlayed ?? 0) >= LANDS_PER_TURN
@@ -573,7 +768,8 @@ function goToPhase(target) {
 function doGoToPhase(target) {
   act(() => {
     let guard = 0;
-    do stepPhase(); while (game.phase !== target && ++guard < PHASES.length + 1);
+    // 戦闘ダメージ・ステップに攻撃クリーチャーがいれば、そこで止めてダメージを計算する
+    do stepPhase(); while (game.phase !== target && !game.combatPending && ++guard < PHASES.length + 1);
   });
 }
 
@@ -663,6 +859,146 @@ function setAutoPass(phase, on) {
 
 const requestText = (r) => `${phaseName(r.from)}を終えて${r.end ? 'ターンを終了' : `${phaseName(r.to)}へ`}`;
 
+// ---------- 戦闘ダメージ ----------
+// 攻撃クリーチャーと相手のブロックから、先制攻撃→通常の順にダメージを計算する。
+// 扱うキーワード：先制攻撃・二段攻撃・トランプル・接死・絆魂・破壊不能（ほかの効果は手で処理する）
+
+function computeCombat() {
+  const units = [];
+  const notes = [];
+  const unit = (side, c) => {
+    const pt = ptOf(c);
+    if (!pt) notes.push(`${c.name}はパワー／タフネスが分からないため、計算に入れていません`);
+    const u = { side, card: c, name: c.name, p: pt?.p ?? 0, t: pt?.t ?? 0, known: !!pt, dmg: c.damage || 0, hit: 0,
+      deathtouched: false, alive: true, kw: new Set(c.keywords ?? []), blockers: [] };
+    units.push(u);
+    return u;
+  };
+  const attackers = game.zones.battlefield.map((i) => game.cards[i]).filter((c) => c.attacking).map((c) => unit('me', c));
+  for (const b of online() ? opp?.state?.battlefield ?? [] : []) {
+    const a = b.block != null && attackers.find((x) => x.card.iid === b.block);
+    if (a) a.blockers.push(unit('opp', b));
+  }
+  for (const a of attackers) {
+    a.blocked = a.blockers.length > 0;
+    if (a.kw.has('menace') && a.blockers.length === 1) notes.push(`${a.name}は威迫を持っているので、1体ではブロックできません（このまま計算しています）`);
+  }
+
+  const r = { attackers, units, notes, toOpp: 0, gain: { me: 0, opp: 0 } };
+  for (const firstStrike of [true, false]) {
+    const deals = (u) => u.alive && u.known && u.p > 0 && (firstStrike
+      ? u.kw.has('first strike') || u.kw.has('double strike')
+      : !u.kw.has('first strike') || u.kw.has('double strike'));
+    const events = []; // [受ける側（null はプレイヤー）, ダメージ, 与える側]
+    for (const a of attackers) {
+      if (!deals(a)) continue;
+      if (!a.blocked) { events.push([null, a.p, a]); continue; }
+      // ブロックした順に致死ダメージを割り振り、残りは最後の1体へ（トランプルならプレイヤーへ）
+      const alive = a.blockers.filter((b) => b.alive);
+      let rest = a.p;
+      alive.forEach((b, i) => {
+        const lethal = !b.known ? 0 : a.kw.has('deathtouch') ? 1 : Math.max(0, b.t - b.dmg);
+        const amount = i === alive.length - 1 && !a.kw.has('trample') ? rest : Math.min(rest, lethal);
+        if (amount > 0) events.push([b, amount, a]);
+        rest -= amount;
+      });
+      if (rest > 0 && a.kw.has('trample')) events.push([null, rest, a]);
+    }
+    for (const a of attackers) for (const b of a.blockers) if (a.alive && deals(b)) events.push([a, b.p, b]);
+    for (const [target, amount, src] of events) {
+      if (src.kw.has('lifelink')) r.gain[src.side] += amount;
+      if (!target) { r.toOpp += amount; continue; }
+      if (!target.known) continue;
+      target.dmg += amount;
+      target.hit += amount;
+      if (src.kw.has('deathtouch')) target.deathtouched = true;
+    }
+    for (const u of units) {
+      if (u.alive && u.known && !u.kw.has('indestructible') && (u.dmg >= u.t || (u.deathtouched && u.hit > 0))) u.alive = false;
+    }
+  }
+  return r;
+}
+
+let combatResult = null;
+
+function openCombat() {
+  const r = computeCombat();
+  combatResult = r;
+  const side = (u) => (u.side === 'me' ? '自分' : '相手');
+  const stat = (u) => (u.known ? `（${u.p}/${u.t}）` : '');
+  const lines = r.attackers.map((a) => (a.blocked
+    ? `${a.name}${stat(a)} → ブロック：${a.blockers.map((b) => `${b.name}${stat(b)}`).join('、')}`
+    : `${a.name}${stat(a)} → ブロックされなかった`));
+  const results = [];
+  if (r.toOpp) results.push(online() ? `相手に${r.toOpp}点のダメージ` : `相手に${r.toOpp}点のダメージ（与えたダメージの合計に足します）`);
+  for (const u of r.units) {
+    if (!u.alive) results.push(`死亡：${u.name}（${side(u)}）`);
+    else if (u.hit) results.push(`${u.name}（${side(u)}）に${u.hit}点のダメージ`);
+  }
+  if (r.gain.me) results.push(`あなたのライフ +${r.gain.me}（絆魂）`);
+  if (r.gain.opp) results.push(`相手のライフ +${r.gain.opp}（絆魂）`);
+  if (!results.length) results.push('ダメージはありません');
+  const li = (text) => Object.assign(document.createElement('li'), { textContent: text });
+  $('combat-attacks').replaceChildren(...lines.map(li));
+  $('combat-results').replaceChildren(...results.map(li));
+  $('combat-notes').replaceChildren(...r.notes.map(li));
+  if (!$('combat').open) $('combat').showModal();
+}
+
+// 計算結果を自分の戦場に反映し、相手の分は相手に送る
+function applyCombat() {
+  const r = combatResult;
+  combatResult = null; // 同じ結果を二度適用しない
+  $('combat').close();
+  if (!r || !game.combatPending) return;
+  act(() => {
+    game.combatPending = false;
+    for (const u of r.units) {
+      if (u.side !== 'me' || zoneOf(u.card.iid) !== 'battlefield') continue;
+      if (!u.alive) moveCard(u.card.iid, 'graveyard');
+      else if (u.dmg) game.cards[u.card.iid].damage = u.dmg;
+    }
+    if (r.gain.me) setLife(game.life + r.gain.me);
+    log(`戦闘ダメージ：相手に${r.toOpp}点`);
+    if (online()) {
+      Net.send({
+        type: 'combat',
+        matchId: game.matchId,
+        damage: r.toOpp,
+        gain: r.gain.opp,
+        creatures: r.units.filter((u) => u.side === 'opp').map((u) => ({ iid: u.card.iid, damage: u.dmg, dead: !u.alive })),
+      });
+      clearHistoryAfterAct = true; // 相手に送った後は元に戻せない
+    } else {
+      game.dealt = (game.dealt ?? 0) + r.toOpp;
+    }
+  });
+}
+
+function skipCombat() {
+  combatResult = null;
+  $('combat').close();
+  game.combatPending = false;
+  render();
+}
+
+// 相手の戦闘ダメージを受け取る（自分のライフ・クリーチャーに反映）
+function receiveCombat(msg) {
+  if (msg.matchId && game.matchId && msg.matchId !== game.matchId) return;
+  netUpdate(() => {
+    for (const x of msg.creatures ?? []) {
+      if (zoneOf(x.iid) !== 'battlefield') continue;
+      if (x.dead) moveCard(x.iid, 'graveyard');
+      else if (x.damage) game.cards[x.iid].damage = x.damage;
+    }
+    if (msg.damage) log(`${oppName()}の攻撃で${msg.damage}点のダメージ`);
+    const life = game.life - (msg.damage || 0) + (msg.gain || 0);
+    if (life !== game.life) setLife(life);
+    game.blocks = {};
+  });
+}
+
 function toggleTap(iid) {
   act(() => {
     const c = game.cards[iid];
@@ -734,6 +1070,7 @@ function render() {
   $('phases').replaceChildren(...PHASES.map(([id, name]) => {
     const b = document.createElement('button');
     b.textContent = name;
+    b.dataset.phase = id;
     b.className = id === game.phase ? 'current' : '';
     b.disabled = !myTurn();
     b.addEventListener('click', () => goToPhase(id));
@@ -742,16 +1079,19 @@ function render() {
   const canAdvance = myTurn() && !(game.toDiscard > 0) && !outgoing;
   for (const id of ['next-phase', 'end-turn']) $(id).disabled = !canAdvance;
   $('phase-current').textContent = `${phaseName(game.phase) || '—'} ▼`;
+  $('phase-current').dataset.phase = game.phase;
   $('phase-current').disabled = !canAdvance;
   $('autopass-reset').hidden = !online() || !autoPass.size;
+  for (const id of ['draw', 'shuffle', 'look-top', 'search-library', 'mill', 'untap-all', 'token']) $(id).disabled = !canPlay();
   $('undo').disabled = !history.length;
 
+  if (!canBlockNow()) blockSel = null;
   renderBanner();
 
-  const bf = game.zones.battlefield;
-  fillZone('bf-main', bf.filter((i) => !game.cards[i].isLand), 'battlefield');
-  fillZone('bf-lands', bf.filter((i) => game.cards[i].isLand), 'battlefield');
+  renderBattlefield();
   fillZone('hand', game.zones.hand, 'hand');
+  // 一人回し：相手に与えたダメージの合計
+  $('dealt-count').textContent = !online() && game.dealt ? `与ダメージ ${game.dealt}` : '';
   $('hand-count').textContent = `(${game.zones.hand.length})`;
 
   $('life').textContent = game.life;
@@ -765,7 +1105,15 @@ function render() {
   renderOpp();
   if (viewer) renderViewer();
   showResultIfNew();
+  // 戦闘ダメージ・ステップに入ったら計算結果を出す
+  if (game.combatPending && game.phase === 'damage' && myTurn() && !$('combat').open) openCombat();
   scheduleSync();
+}
+
+function renderBattlefield() {
+  const bf = game.zones.battlefield;
+  fillZone('bf-main', bf.filter((i) => !game.cards[i].isLand), 'battlefield');
+  fillZone('bf-lands', bf.filter((i) => game.cards[i].isLand), 'battlefield');
 }
 
 // 自分のログ・相手のログ・チャットを時刻順にまとめて表示
@@ -818,12 +1166,22 @@ function markUnread(others) {
   btn.classList.toggle('unread', others > seenOthers);
 }
 
+// 相手の攻撃中：ブロックの指定のしかた
+function blockHint() {
+  if (!canBlockNow()) return [];
+  const text = blockSel != null
+    ? `${game.cards[blockSel]?.name}でブロックする相手の攻撃クリーチャーをクリック`
+    : 'ブロック：自分のクリーチャー → 相手の攻撃クリーチャーの順にクリック';
+  return [Object.assign(document.createElement('span'), { className: 'block-hint', textContent: text })];
+}
+
 function renderBanner() {
   const bar = $('mulligan-bar');
+  bar.classList.remove('big');
   if (game.toDiscard > 0) {
     bar.hidden = false;
     const label = document.createElement('span');
-    label.textContent = `クリンナップ：手札が${MAX_HAND}枚になるまで、捨てるカードを手札からあと${game.toDiscard}枚クリックしてください`;
+    label.textContent = `クリーンアップ：手札が${MAX_HAND}枚になるまで、捨てるカードを手札からあと${game.toDiscard}枚クリックしてください`;
     const skip = document.createElement('button');
     skip.textContent = '捨てずに続ける';
     skip.addEventListener('click', skipDiscard);
@@ -855,6 +1213,7 @@ function renderBanner() {
     auto.append(box, span('このステップは次から自動でOK'));
     bar.replaceChildren(
       span(`${oppName()}：${requestText(incoming)}`),
+      ...blockHint(),
       incoming.held ? span('対応中：終わったら「OK」を押してください') : button('対応する', holdRequest),
       button('OK', approveRequest, true),
       auto,
@@ -873,24 +1232,34 @@ function renderBanner() {
     force.addEventListener('click', () => {
       if (confirm('相手のターンを待たずに、自分のターンを始めますか？')) forceMyTurn();
     });
-    bar.replaceChildren(label, ...(game.orderFixed ? [force] : []));
+    bar.replaceChildren(label, ...blockHint(), ...(game.orderFixed ? [force] : []));
     return;
   }
   bar.hidden = game.turn > 0;
   if (bar.hidden) return;
+  // マリガン：選択肢を大きなパネルで出す
+  bar.classList.add('big');
+  const title = (text) => Object.assign(document.createElement('div'), { className: 'title', textContent: text });
+  const note = (text) => Object.assign(document.createElement('div'), { className: 'note', textContent: text });
   if (game.phase === 'mulligan') {
-    const label = document.createElement('span');
-    label.textContent = game.mulligans ? `マリガン${game.mulligans}回目の手札` : '初手';
-    const m = document.createElement('button');
-    m.textContent = 'マリガン';
-    m.addEventListener('click', mulligan);
-    const k = document.createElement('button');
-    k.className = 'primary';
-    k.textContent = 'キープ';
-    k.addEventListener('click', keep);
-    bar.replaceChildren(label, m, k);
+    const n = game.mulligans;
+    const choices = document.createElement('div');
+    choices.className = 'choices';
+    const m = button('マリガン', mulligan);
+    // 7回マリガンすると手札が残らないので、それ以上はできない
+    m.disabled = n >= MAX_HAND;
+    choices.append(m, button('キープ', keep, true));
+    bar.replaceChildren(
+      title(n ? `マリガン${n}回目の手札` : '初手'),
+      note(n ? `キープすると、手札から${n}枚をライブラリーの一番下に置きます（手札${MAX_HAND - n}枚で開始）`
+        : 'この7枚で始めるならキープ、引き直すならマリガン'),
+      choices,
+    );
   } else {
-    bar.textContent = `ライブラリーの一番下に置くカードを、手札からあと${game.toBottom}枚クリックしてください`;
+    bar.replaceChildren(
+      title(`ライブラリーの一番下に置くカードを選択（あと${game.toBottom}枚）`),
+      note('手札のカードをクリック（スマホはタップ）すると、ライブラリーの一番下に置きます'),
+    );
   }
 }
 
@@ -902,31 +1271,12 @@ function cardEl(iid, zone) {
   const c = game.cards[iid];
   const el = document.createElement('div');
   el.className = 'card' + (c.tapped ? ' tapped' : '') + (c.token ? ' token' : '') + (c.attacking ? ' attacking' : '');
-  el.draggable = !phone();
-  el.title = c.name;
-  if (c.image) {
-    const img = document.createElement('img');
-    img.src = c.image;
-    img.alt = c.name;
-    el.append(img);
-  } else {
-    const text = document.createElement('div');
-    text.className = 'text';
-    text.textContent = c.name;
-    el.append(text);
-  }
-  if (c.counters) {
-    const badge = document.createElement('span');
-    badge.className = 'counter';
-    badge.textContent = c.counters;
-    el.append(badge);
-  }
-
-  if (c.attacking) {
-    const atk = document.createElement('span');
-    atk.className = 'atk';
-    atk.textContent = '攻撃';
-    el.append(atk);
+  el.draggable = !phone() && canPlay();
+  fillCardFace(el, c);
+  if (zone === 'battlefield') {
+    addBadges(el, c, 'me');
+    if (myTurn() && isSick(c)) el.classList.add('sick');
+    if (blockSel === iid) el.classList.add('block-select');
   }
 
   if (zone === 'hand' && game.phase === 'keep') {
@@ -935,6 +1285,9 @@ function cardEl(iid, zone) {
   } else if (zone === 'hand' && game.toDiscard > 0) {
     el.classList.add('selectable');
     el.addEventListener('click', () => discardFromHand(iid));
+  } else if (zone === 'hand' && !canPlay()) {
+    // マリガン中は見るだけ（スマホはタップで拡大表示）
+    el.addEventListener('click', () => { if (phone()) showCardDetail(detailOf(c)); });
   } else if (zone === 'hand') {
     el.addEventListener('dblclick', () => moveByUser(iid, 'battlefield'));
     // スマホ：タップでカードの拡大とメニュー（「戦場へ」など）
@@ -951,9 +1304,43 @@ function cardEl(iid, zone) {
     if (!phone()) openCardMenu(iid, e.clientX, e.clientY);
   });
   // スマホ：長押しで拡大表示（そこから操作のメニューも開ける）
-  onLongPress(el, () => showCardDetail(c, [['操作メニュー', () => openCardMenu(iid, 0, 0)]]));
+  onLongPress(el, () => showCardDetail(detailOf(c), canPlay() ? [['操作メニュー', () => openCardMenu(iid, 0, 0)]] : []));
   el.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', String(iid)));
   return el;
+}
+
+// カードの絵（なければ名前）。マウスを乗せると名前・P/T・効果テキストを出す
+function fillCardFace(el, c) {
+  el.title = [c.name, ptText(c), c.text].filter(Boolean).join('\n');
+  if (c.image) {
+    const img = document.createElement('img');
+    img.src = c.image;
+    img.alt = c.name;
+    el.append(img);
+  } else {
+    const text = document.createElement('div');
+    text.className = 'text';
+    text.textContent = c.name;
+    el.append(text);
+  }
+}
+
+// 戦場のカードの印：カウンター・P/T（ダメージを負っていれば赤）・攻撃／ブロック
+// side: 'me' は自分のカード、'opp' は相手のカード（snapshot の形）
+function addBadges(el, c, side) {
+  const badge = (className, text) => el.append(Object.assign(document.createElement('span'), { className, textContent: text }));
+  if (c.counters) badge('counter', c.counters);
+  const pt = c.isCreature !== false && !c.isLand && ptOf(c);
+  if (pt) badge('pt' + (c.damage ? ' damaged' : '') + (c.ptMod ? ' modified' : ''), c.damage ? `${pt.p}/${pt.t}(-${c.damage})` : `${pt.p}/${pt.t}`);
+  if (c.attacking) {
+    // 何体にブロックされているか（守る側のブロックの指定から数える）
+    const blockers = side === 'me'
+      ? (opp?.state?.battlefield ?? []).filter((b) => b.block === c.iid).length
+      : game.zones.battlefield.filter((i) => game.blocks?.[i] === c.iid).length;
+    badge('atk', blockers ? `攻撃（ブロック×${blockers}）` : '攻撃');
+  } else if ((side === 'me' ? game.blocks?.[c.iid] : c.block) != null) {
+    badge('atk blk', 'ブロック');
+  }
 }
 
 function showPreview(c) {
@@ -968,35 +1355,18 @@ function showPreview(c) {
 function oppCardEl(c) {
   const el = document.createElement('div');
   el.className = 'card' + (c.tapped ? ' tapped' : '') + (c.token ? ' token' : '') + (c.attacking ? ' attacking' : '');
-  el.title = c.name;
-  if (c.image) {
-    const img = document.createElement('img');
-    img.src = c.image;
-    img.alt = c.name;
-    el.append(img);
-  } else {
-    const text = document.createElement('div');
-    text.className = 'text';
-    text.textContent = c.name;
-    el.append(text);
-  }
-  if (c.counters) {
-    const badge = document.createElement('span');
-    badge.className = 'counter';
-    badge.textContent = c.counters;
-    el.append(badge);
-  }
-  if (c.attacking) {
-    const atk = document.createElement('span');
-    atk.className = 'atk';
-    atk.textContent = '攻撃';
-    el.append(atk);
-  }
+  fillCardFace(el, c);
+  addBadges(el, c, 'opp');
+  if (c.attacking && blockSel != null && canBlockNow()) el.classList.add('block-target');
   el.addEventListener('mouseenter', () => showPreview(c));
-  // スマホ：タップ・長押しで拡大表示
-  el.addEventListener('click', () => { if (phone()) showCardDetail(c); });
+  el.addEventListener('click', () => {
+    // ブロック：自分のクリーチャーを選んだあと、相手の攻撃クリーチャーをクリック
+    if (c.attacking && blockSel != null && canBlockNow()) return blockAttacker(c);
+    // スマホ：タップで拡大表示
+    if (phone()) showCardDetail(detailOf(c));
+  });
   el.addEventListener('contextmenu', (e) => e.preventDefault());
-  onLongPress(el, () => showCardDetail(c));
+  onLongPress(el, () => showCardDetail(detailOf(c)));
   return el;
 }
 
@@ -1035,7 +1405,14 @@ function snapshot() {
   if (!game) return null;
   const pub = (iid) => {
     const c = game.cards[iid];
-    return { name: c.name, image: c.image, tapped: !!c.tapped, counters: c.counters || 0, attacking: !!c.attacking, isLand: !!c.isLand, token: !!c.token };
+    return {
+      iid, name: c.name, image: c.image, tapped: !!c.tapped, counters: c.counters || 0, attacking: !!c.attacking,
+      isLand: !!c.isLand, isCreature: c.isCreature !== false, token: !!c.token,
+      // 効果テキスト・P/T・キーワード（相手の画面での表示と、戦闘ダメージの計算に使う）
+      typeLine: c.typeLine ?? '', text: c.text ?? '', power: c.power ?? null, toughness: c.toughness ?? null,
+      keywords: c.keywords ?? [], ptMod: c.ptMod ?? null, damage: c.damage || 0,
+      block: game.blocks?.[iid] ?? null,
+    };
   };
   return {
     deckName: game.deckName,
@@ -1064,6 +1441,7 @@ function sendHello() {
   Net.send({
     type: 'hello',
     name: myName(),
+    avatar: myAvatar(),
     // 先手・後手は部屋を作った側が決める（ゲーム開始前なら null）
     hostOnDraw: Net.role === 'host' && game ? !!game.onDraw : null,
     matchId: Net.role === 'host' ? game?.matchId ?? null : null,
@@ -1102,7 +1480,8 @@ function setupNet() {
   });
   Net.on('hello', (msg) => {
     const first = !opp?.name;
-    opp = { ...opp, name: String(msg.name || '相手').slice(0, 16), connected: true };
+    opp = { ...opp, name: String(msg.name || '相手').slice(0, 16), avatar: validAvatar(msg.avatar), connected: true };
+    renderAvatars();
     if (first) systemMessage(`${oppName()}が参加しました`);
     if (Net.role === 'host' && msg.needOrder) sendHello();
     if (Net.role === 'guest' && msg.hostOnDraw !== null && msg.hostOnDraw !== undefined) {
@@ -1121,6 +1500,18 @@ function setupNet() {
   });
   Net.on('state', (msg) => {
     opp = { ...opp, state: msg.state, connected: true };
+    if (game) {
+      // 相手の戦闘が終わったら、自分のブロックの指定を消す
+      if (!['attack', 'block', 'damage'].includes(msg.state?.phase) && Object.keys(game.blocks ?? {}).length) {
+        game.blocks = {};
+        saveGame();
+        scheduleSync();
+      }
+      if (!canBlockNow()) blockSel = null;
+      // ブロックの表示（相手の攻撃・ブロックの状態）を自分の戦場にも反映する。相手に送り返さないよう render は使わない
+      renderBattlefield();
+      renderBanner();
+    }
     renderOpp();
     showResultIfNew();
     renderLog();
@@ -1128,6 +1519,9 @@ function setupNet() {
   });
   Net.on('pass', (msg) => {
     if (game) receivePass(msg);
+  });
+  Net.on('combat', (msg) => {
+    if (game) receiveCombat(msg);
   });
   Net.on('priority', (msg) => {
     if (game) receiveRequest(msg);
@@ -1221,6 +1615,7 @@ function hideMenu() {
 }
 
 function openCardMenu(iid, x, y) {
+  if (!canPlay()) return;
   const c = game.cards[iid];
   const zone = zoneOf(iid);
   const items = [];
@@ -1235,7 +1630,9 @@ function openCardMenu(iid, x, y) {
       [c.tapped ? 'アンタップ' : 'タップ', () => toggleTap(iid)],
       ['カウンター +1', () => act(() => { c.counters++; Sound.play('counter'); log(`${c.name}にカウンター（${c.counters}）`); })],
       ['カウンター −1', () => act(() => { c.counters--; Sound.play('counter'); log(`${c.name}のカウンター（${c.counters}）`); })],
-      ['このカードのトークン・コピーを出す', () => act(() => createToken(c.name, c.image))],
+      ...(ptOf(c) ? [['このターン +X/+X…', () => modifyPt(iid)]] : []),
+      ...(c.damage ? [['ダメージを取り除く', () => act(() => { delete c.damage; log(`${c.name}のダメージを取り除いた`); })]] : []),
+      ['このカードのトークン・コピーを出す', () => act(() => createToken(c.name, c.image, c))],
       '-',
     );
   }
@@ -1250,7 +1647,21 @@ function openCardMenu(iid, x, y) {
   showMenu(items, x, y, c);
 }
 
+// 「このターン +2/+2」のような修整（ターンの終わりに元に戻る）
+function modifyPt(iid) {
+  const c = game.cards[iid];
+  const v = prompt('このターンの修整（例: +2/+2、-1/-1、+3/+0）', '+1/+1');
+  const m = v?.trim().match(/^([+-]?\d+)\s*\/\s*([+-]?\d+)$/);
+  if (!m) return;
+  act(() => {
+    const cur = c.ptMod ?? { p: 0, t: 0 };
+    c.ptMod = { p: cur.p + Number(m[1]), t: cur.t + Number(m[2]) };
+    log(`${c.name}にこのターン${m[1]}/${m[2]}（${ptText(c)}）`);
+  });
+}
+
 function openLibraryMenu(x, y) {
+  if (!canPlay()) return;
   showMenu([
     ['1枚引く', drawOne],
     ['X枚引く…', () => {
@@ -1268,10 +1679,11 @@ function openLibraryMenu(x, y) {
 }
 
 function drawOne() {
-  act(() => drawCards(1));
+  if (canPlay()) act(() => drawCards(1));
 }
 
 function shuffleLibrary() {
+  if (!canPlay()) return;
   act(() => {
     shuffle(game.zones.library);
     Sound.play('shuffle');
@@ -1280,6 +1692,7 @@ function shuffleLibrary() {
 }
 
 function millTo(zone) {
+  if (!canPlay()) return;
   const n = askNumber(`上から何枚を${ZONES[zone]}に置きますか？`);
   if (!n) return;
   act(() => {
@@ -1290,6 +1703,7 @@ function millTo(zone) {
 }
 
 function lookTop() {
+  if (!canPlay()) return;
   const n = askNumber('上から何枚見ますか？', '3');
   if (!n) return;
   const shown = Math.min(n, game.zones.library.length);
@@ -1298,6 +1712,7 @@ function lookTop() {
 }
 
 function searchLibrary() {
+  if (!canPlay()) return;
   act(() => log('ライブラリーを探した'));
   openViewer('library', 'ライブラリー（左が一番上）', null);
 }
@@ -1355,6 +1770,7 @@ function openSetup() {
   select.value = String(requested || game?.deckId || decks[0]?.id || '');
   $('setup-error').textContent = decks.length ? '' : 'デッキがありません。デッキ作成画面で作ってください。';
   $('player-name').value = myName();
+  $('setup-form').elements.avatar.value = myAvatar();
   const mode = netInfo?.role === 'host' ? 'host' : netInfo?.role === 'guest' ? 'join' : 'solo';
   $('setup-form').elements.mode.value = mode;
   $('room-code').value = netInfo?.role === 'guest' ? netInfo.code : '';
@@ -1380,6 +1796,7 @@ function startFromSetup(e) {
   const form = new FormData($('setup-form'));
   const mode = form.get('mode');
   const name = String(form.get('name') ?? '').trim().slice(0, 16);
+  setAvatar(form.get('avatar'));
   try {
     if (name) {
       sessionStorage.setItem(NAME_KEY, name);
@@ -1475,8 +1892,9 @@ function init() {
   $('look-top').addEventListener('click', lookTop);
   $('search-library').addEventListener('click', searchLibrary);
   $('mill').addEventListener('click', () => millTo('graveyard'));
-  $('untap-all').addEventListener('click', () => act(() => { untapAll(); log('すべてアンタップ'); }));
+  $('untap-all').addEventListener('click', () => { if (canPlay()) act(() => { untapAll(); log('すべてアンタップ'); }); });
   $('token').addEventListener('click', () => {
+    if (!canPlay()) return;
     const name = prompt('トークン名（例: 1/1 兵士）');
     if (name?.trim()) act(() => createToken(name.trim()));
   });
@@ -1496,12 +1914,23 @@ function init() {
   $('setup').addEventListener('close', () => { if (!game) $('setup').showModal(); });
   $('setup-form').addEventListener('submit', startFromSetup);
   $('concede').addEventListener('click', concede);
+  $('random-name').addEventListener('click', () => {
+    $('player-name').value = randomName();
+    Sound.play('button');
+  });
+  // 自分のアバターをクリックすると次のアバターに替える
+  $('my-avatar').addEventListener('click', () => setAvatar(AVATARS[(AVATARS.indexOf(myAvatar()) + 1) % AVATARS.length]));
+  buildAvatarChoices();
+  renderAvatars();
   $('autopass-reset').addEventListener('click', () => {
     autoPass.clear();
     saveJson(localStorage, AUTOPASS_KEY, []);
     render();
   });
   $('result-close').addEventListener('click', () => $('result').close());
+  $('combat-apply').addEventListener('click', applyCombat);
+  $('combat-skip').addEventListener('click', skipCombat);
+  $('combat').addEventListener('cancel', (e) => { e.preventDefault(); skipCombat(); });
   $('result-again').addEventListener('click', () => {
     $('result').close();
     openSetup();

@@ -120,6 +120,11 @@ function slimCard(c) {
     legalities: c.legalities,
     // 土地を出したときの効果音（マナの色）に使う
     produced: c.produced_mana ?? [],
+    // 一人回し・対戦で使う効果テキスト・パワー／タフネス・キーワード能力（表面）
+    oracleText: oracle,
+    power: c.power ?? face.power ?? null,
+    toughness: c.toughness ?? face.toughness ?? null,
+    keywords: c.keywords ?? [],
     copyRule: copyRule(c.type_line ?? '', oracle),
     art: artMode(),
   };
@@ -181,6 +186,8 @@ function rememberJa(c) {
   jaCache.set(id, {
     name: c.printed_name ?? face.printed_name ?? c.name,
     image: score ? url : null,
+    // 日本語の効果テキスト（両面カードは面ごとに改行でつなぐ）
+    text: c.printed_text ?? c.card_faces?.map((f) => f.printed_text).filter(Boolean).join('\n') ?? '',
     score,
   });
 }
@@ -198,7 +205,8 @@ function persistJa() {
   for (const d of state.decks) {
     for (const { card } of Object.values(d.cards)) {
       const ja = jaCache.get(card.oracleId);
-      if (ja && (!card.ja || (card.ja.score ?? 0) < ja.score)) {
+      // 以前に保存した日本語版には効果テキストがないので、取得できたら入れ直す
+      if (ja && (!card.ja || (card.ja.score ?? 0) < ja.score || (card.ja.text === undefined && ja.text !== undefined))) {
         card.ja = ja;
         changed = true;
       }
@@ -258,15 +266,17 @@ async function refreshArt(cards) {
   } catch {}
 }
 
-// 以前に保存したデッキの土地に、出せるマナの色（produced）を補う
-async function fillProduced() {
-  const lands = allDeckCards().filter((c) => c.oracleId && c.produced === undefined && /\bLand\b/.test(c.typeLine));
-  if (!lands.length) return;
+// 以前に保存したデッキのカードに、あとから増やした情報（マナの色・効果テキスト・P/T・キーワード）を補う
+const INFO_FIELDS = ['produced', 'oracleText', 'power', 'toughness', 'keywords'];
+async function fillCardInfo() {
+  const missing = allDeckCards().filter((c) => c.oracleId && c.oracleText === undefined);
+  if (!missing.length) return;
   try {
-    await searchByOracleIds(lands, '', (found) => {
-      const byId = new Map(found.map((c) => [oracleIdOf(c), c.produced_mana ?? []]));
+    await searchByOracleIds(missing, '', (found) => {
+      const byId = new Map(found.map((c) => [oracleIdOf(c), slimCard(c)]));
       for (const card of allDeckCards()) {
-        if (card.produced === undefined && byId.has(card.oracleId)) card.produced = byId.get(card.oracleId);
+        const info = card.oracleText === undefined && byId.get(card.oracleId);
+        if (info) for (const k of INFO_FIELDS) card[k] = info[k];
       }
       saveState();
     });
@@ -842,7 +852,11 @@ async function runImport(e) {
 // ---------- 描画 ----------
 
 // 拡大表示に渡すカード（表示中の名前・画像）
-const detailOf = (card) => ({ name: nameOf(card), image: imageOf(card) });
+const detailOf = (card) => {
+  const ja = state.ja ? jaCache.get(card.oracleId) ?? card.ja : null;
+  const pt = card.power != null ? `${card.power}/${card.toughness}` : '';
+  return { name: nameOf(card), image: imageOf(card), text: [card.typeLine, ja?.text || card.oracleText, pt].filter(Boolean).join('\n') };
+};
 
 function renderResults() {
   const box = $('results');
@@ -1069,7 +1083,7 @@ function init() {
   validateDeck();
   localize(deckEntries().map((e) => e.card));
   refreshArt(allDeckCards());
-  fillProduced();
+  fillCardInfo();
   fixCopyRules();
 }
 

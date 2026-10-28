@@ -18,11 +18,16 @@
   --felt: #335a32;
   --felt-line: rgba(0, 0, 0, .35);
 }
-:root[data-felt="white"] { --felt: #928e82; --felt-line: rgba(0, 0, 0, .25); }
-:root[data-felt="blue"]  { --felt: #304760; }
-:root[data-felt="black"] { --felt: #2c292e; --felt-line: rgba(255, 255, 255, .08); }
-:root[data-felt="red"]   { --felt: #633129; }
-:root[data-felt="green"] { --felt: #335a32; }
+/* 戦場の背景の絵（img/bg-*.jpg）。少し暗くしてカードを見やすくする */
+:root[data-felt] {
+  --felt-line: rgba(255, 255, 255, .1);
+  --felt-shade: linear-gradient(rgba(0, 0, 0, .3), rgba(0, 0, 0, .3));
+}
+:root[data-felt="temple"]  { --felt: #5e5544; --felt-image: url("img/bg-temple.jpg?v=2"); }
+:root[data-felt="river"]   { --felt: #1e3442; --felt-image: url("img/bg-river.jpg?v=2"); }
+:root[data-felt="swamp"]   { --felt: #1c2119; --felt-image: url("img/bg-swamp.jpg?v=2"); }
+:root[data-felt="magma"]   { --felt: #3c140a; --felt-image: url("img/bg-magma.jpg?v=2"); }
+:root[data-felt="forest"]  { --felt: #26381a; --felt-image: url("img/bg-forest.jpg?v=2"); }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -40,7 +45,7 @@ a { color: var(--ink); }
 
 /* フェルトの面（戦場・検索結果など） */
 .felt {
-  background: var(--felt);
+  background: var(--felt-shade, none), var(--felt-image, none) center / cover no-repeat, var(--felt);
   transition: background-color .2s;
 }
 
@@ -153,11 +158,13 @@ input[type="radio"] { accent-color: #8a8a8a; margin: 0; }
   box-shadow: 0 0 0 1px #646464;
 }
 .felt-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px #ddd; }
-.felt-white { background: #928e82; }
-.felt-blue  { background: #304760; }
-.felt-black { background: #2c292e; }
-.felt-red   { background: #633129; }
-.felt-green { background: #335a32; }
+/* 丸いボタンには背景の絵の中央あたりを出す */
+.felt-swatch, .felt-swatch:hover:not(:disabled), .felt-swatch:active:not(:disabled) { background: var(--swatch) 50% 55% / 320% no-repeat; }
+.felt-temple  { --swatch: url("img/bg-temple.jpg?v=2"); }
+.felt-river   { --swatch: url("img/bg-river.jpg?v=2"); }
+.felt-swamp   { --swatch: url("img/bg-swamp.jpg?v=2"); }
+.felt-magma   { --swatch: url("img/bg-magma.jpg?v=2"); }
+.felt-forest  { --swatch: url("img/bg-forest.jpg?v=2"); }
 
 .bottombar {
   display: flex;
@@ -252,27 +259,45 @@ html.phone .row .name { -webkit-touch-callout: none; -webkit-user-select: none; 
 }
 .card-detail-card .text { aspect-ratio: 488 / 680; padding: 16px; color: #111; font-size: 18px; background: #e8e8e4; }
 .card-detail-name { color: var(--ink); font-size: 15px; text-align: center; }
+.card-detail-text:empty { display: none; }
+/* 効果テキストがあるときは、その分だけ画像を小さくする */
+.card-detail-body:has(.card-detail-text:not(:empty)) .card-detail-card img,
+.card-detail-body:has(.card-detail-text:not(:empty)) .card-detail-card .text { width: min(92vw, calc((76dvh - 160px) * 488 / 680)); }
+.card-detail-text {
+  width: min(92vw, 420px);
+  max-height: 24dvh;
+  overflow: auto;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--ink);
+  background: rgba(40, 40, 40, .92);
+  border: 1px solid #000;
+}
 .card-detail-actions { display: flex; gap: 10px; }
 .card-detail-actions:empty { display: none; }
 .card-detail-actions button { min-width: 110px; min-height: 40px; font-size: 15px; }
 
-/* ロゴ：PC は正式名、スマホは短い名前 */
-.logo-short { display: none; }
-html.phone .logo-full { display: none; }
-html.phone .logo-short { display: inline; }
+/* ロゴの画像（img/logo.png）。スマホは小さくして「System」を省く */
+.logo { display: flex; align-items: flex-end; }
+.logo-img { display: block; height: 30px; width: auto; }
+html.phone .logo-img { height: 24px; }
 
-/* 表示言語の切り替え（国旗） */
-.lang-picker { display: flex; align-items: center; gap: 4px; }
+/* 表示言語の切り替え：今の言語の国旗を丸く1つだけ出す（押すと切り替え） */
+.lang-picker { display: flex; align-items: center; }
 .lang-btn, .lang-btn:hover:not(:disabled), .lang-btn:active:not(:disabled) {
-  width: 30px;
-  height: 22px;
+  flex: none;
+  width: 18px;
+  height: 18px;
   min-height: 0;
-  padding: 2px;
+  padding: 0;
+  overflow: hidden;
   background: #2d2d2d;
   border: 1px solid #000;
-  box-shadow: var(--sunken);
-  opacity: .55;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #686868;
 }
+.lang-btn:hover:not(:disabled) { box-shadow: 0 0 0 2px #ddd; }
 .lang-btn svg { display: block; width: 100%; height: 100%; }
-.lang-btn[aria-pressed="true"] { opacity: 1; box-shadow: var(--raised); background: #5c5c5c; }
-html.phone .lang-btn { width: 34px; height: 26px; }
+html.phone .lang-btn, html.phone .lang-btn:hover:not(:disabled), html.phone .lang-btn:active:not(:disabled) { width: 22px; height: 22px; min-height: 0; padding: 0; }

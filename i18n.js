@@ -54,6 +54,19 @@
     'Scryfall に接続できません。短時間に検索しすぎた場合は1分ほど待ってから再度お試しください': 'Cannot connect to Scryfall. If you searched too often, wait about a minute and try again.',
     'カード検索 ': 'Card Search ', 'デッキ（': 'Deck (', '枚）': ' cards)', '枚': 'cards',
     // 一人回し・対戦：画面
+    'ランダムな名前': 'Random name',
+    // 戦闘
+    'このターン +X/+X…': 'This turn +X/+X…', 'ダメージを取り除く': 'Remove damage',
+    'このターンの修整（例: +2/+2、-1/-1、+3/+0）': 'Modifier for this turn (e.g. +2/+2, -1/-1, +3/+0)',
+    'ブロック：自分のクリーチャー → 相手の攻撃クリーチャーの順にクリック': 'Block: click your creature, then an attacking creature',
+    'タップしているクリーチャーはブロックできません': "Tapped creatures can't block",
+    '戦闘ダメージ': 'Combat Damage', '結果': 'Result', '適用': 'Apply', '適用しない': "Don't apply", 'ダメージはありません': 'No damage',
+    'キーワード能力（先制攻撃・二段攻撃・トランプル・接死・絆魂・破壊不能）だけを計算しています。ほかの効果は「適用しない」で閉じて手で処理してください。':
+      'Only keyword abilities (first strike, double strike, trample, deathtouch, lifelink, indestructible) are calculated. For other effects, close with "Don\'t apply" and handle them by hand.',
+    '一人回しで相手に与えたダメージの合計': 'Total damage dealt to the opponent (solo)',
+    'この7枚で始めるならキープ、引き直すならマリガン': 'Keep to start with these 7 cards, or mulligan to draw a new hand',
+    '手札のカードをクリック（スマホはタップ）すると、ライブラリーの一番下に置きます': 'Click (or tap) a card in your hand to put it on the bottom of your library',
+    'アバター': 'Avatar', 'クリックでアバターを変える': 'Click to change your avatar',    '神殿': 'Temple', '川': 'River', '沼地': 'Swamp', 'マグマ': 'Magma', '森': 'Forest',
     '操作メニュー': 'Actions', '1枚追加': 'Add 1', '1枚減らす': 'Remove 1',
     '効果音：オン': 'Sound: On', '効果音：オフ': 'Sound: Off',
     '元に戻す': 'Undo', 'リスタート': 'Restart', 'ターン終了': 'End Turn', '次へ': 'Next', 'フェイズを選ぶ': 'Choose phase',
@@ -78,7 +91,7 @@
     'デッキに7枚以上のカードが必要です。': 'The deck needs at least 7 cards.', '部屋コードを入力してください。': 'Enter a room code.',
     // フェイズ
     'アンタップ': 'Untap', 'アップキープ': 'Upkeep', 'ドロー': 'Draw', 'メイン1': 'Main 1', '戦闘開始': 'Begin Combat', '攻撃': 'Attack',
-    'ブロック': 'Block', 'ダメージ': 'Damage', '戦闘終了': 'End Combat', 'メイン2': 'Main 2', '終了': 'End', 'クリンナップ': 'Cleanup',
+    'ブロック': 'Block', 'ダメージ': 'Damage', '戦闘終了': 'End Combat', 'メイン2': 'Main 2', '終了': 'End', 'クリーンアップ': 'Cleanup',
     'マリガン': 'Mulligan', '開始待ち': 'Waiting to start', '準備中': 'Preparing', '初手': 'Opening hand', 'キープ': 'Keep',
     '初手を確認して、キープかマリガンを選んでください。': 'Check your opening hand and choose Keep or Mulligan.',
     'ライブラリーの一番下に置くカードを手札から選んでください。': 'Choose cards from your hand to put on the bottom of your library.',
@@ -91,7 +104,7 @@
     'ブロック・クリーチャー指定ステップ。': 'Declare blockers step.', '戦闘ダメージ・ステップ。': 'Combat damage step.', '戦闘終了ステップ。': 'End of combat step.',
     '第2メイン・フェイズ。土地をプレイしたり、呪文を唱えたりできます。': 'Second main phase. You may play a land and cast spells.',
     '終了ステップ。インスタントを唱えたり、能力を起動したりできます。': 'End step. You may cast instants and activate abilities.',
-    'クリンナップ・ステップ。': 'Cleanup step.', '相手を待っています。': 'Waiting for the opponent.', '相手を待っています': 'Waiting for the opponent',
+    'クリーンアップ・ステップ。': 'Cleanup step.', '相手を待っています。': 'Waiting for the opponent.', '相手を待っています': 'Waiting for the opponent',
     '相手プレイヤーのターンです': "Opponent's turn",
     '相手プレイヤーのターンです。インスタントを唱えたり、能力を起動したりできます。': "Opponent's turn. You may cast instants and activate abilities.",
     '相手の接続を待っています（先手・後手は部屋を作った人が決めます）': 'Waiting for the opponent to connect (the room creator decides the play order)',
@@ -129,7 +142,7 @@
   const T = (s) => EXACT.get(s) ?? s;
   const list = (s) => s.split('、').join(', ');
   const cards = (n) => `${n} card${Number(n) === 1 ? '' : 's'}`;
-  const PHASE_RE = '(アンタップ|アップキープ|ドロー|メイン1|戦闘開始|攻撃|ブロック|ダメージ|戦闘終了|メイン2|終了|クリンナップ)';
+  const PHASE_RE = '(アンタップ|アップキープ|ドロー|メイン1|戦闘開始|攻撃|ブロック|ダメージ|戦闘終了|メイン2|終了|クリーンアップ)';
   const POOL_NOTE = /^日本語名の候補が多いため古い順に(\d+)件から抽出。条件を足すか英語名で検索すると確実です$/;
   const poolNote = (s) => s.replace(POOL_NOTE, (_, n) => `many Japanese-name matches, so only the oldest ${n} were checked; add conditions or search in English to be sure`);
 
@@ -172,6 +185,28 @@
     [/^敗北：(.+)$/, (_, r) => `Defeat: ${T(r)}`],
     [new RegExp(`^相手の確認待ち（${PHASE_RE}を終えて(?:${PHASE_RE}へ|(ターンを終了))）$`), (_, f, t, end) => `Waiting for the opponent's OK (leave ${T(f)} → ${end ? 'end turn' : T(t)})`],
     [new RegExp(`^(.+)：${PHASE_RE}を終えて(?:${PHASE_RE}へ|(ターンを終了))$`), (_, p, f, t, end) => `${T(p)}: leaving ${T(f)} → ${end ? 'end turn' : T(t)}`],
+    // 戦闘
+    [/^(.+)はこのターンに出たので攻撃できません（召喚酔い）$/, (_, c) => `${c} entered this turn and can't attack (summoning sickness)`],
+    [/^(.+)でブロックする相手の攻撃クリーチャーをクリック$/, (_, c) => `Click the attacking creature to block with ${c}`],
+    [/^(.+)は飛行を持っています。飛行か到達がないとブロックできません$/, (_, c) => `${c} has flying. Only creatures with flying or reach can block it`],
+    [/^(.+)のブロックを取り消し$/, (_, c) => `${c} no longer blocking`],
+    [/^攻撃（ブロック×(\d+)）$/, (_, n) => `Attacking (blocked ×${n})`],
+    [/^(.+) → ブロックされなかった$/, (_, a) => `${a} → unblocked`],
+    [/^(.+) → ブロック：(.+)$/, (_, a, b) => `${a} → blocked by ${list(b)}`],
+    [/^相手に(\d+)点のダメージ$/, (_, n) => `${n} damage to the opponent`],
+    [/^相手に(\d+)点のダメージ（与えたダメージの合計に足します）$/, (_, n) => `${n} damage to the opponent (added to the total dealt)`],
+    [/^死亡：(.+)（(自分|相手)）$/, (_, c, s) => `Dies: ${c} (${s === '自分' ? 'yours' : "opponent's"})`],
+    [/^(.+)（(自分|相手)）に(\d+)点のダメージ$/, (_, c, s, n) => `${c} (${s === '自分' ? 'yours' : "opponent's"}) takes ${n} damage`],
+    [/^あなたのライフ \+(\d+)（絆魂）$/, (_, n) => `Your life +${n} (lifelink)`],
+    [/^相手のライフ \+(\d+)（絆魂）$/, (_, n) => `Opponent's life +${n} (lifelink)`],
+    [/^(.+)はパワー／タフネスが分からないため、計算に入れていません$/, (_, c) => `${c} has unknown power/toughness and was left out of the calculation`],
+    [/^(.+)は威迫を持っているので、1体ではブロックできません（このまま計算しています）$/, (_, c) => `${c} has menace and can't be blocked by just one creature (calculated anyway)`],
+    [/^戦闘ダメージ：相手に(\d+)点$/, (_, n) => `Combat damage: ${n} to the opponent`],
+    [/^(.+)の攻撃で(\d+)点のダメージ$/, (_, p, n) => `Took ${n} damage from ${T(p)}'s attack`],
+    [/^(.+)にこのターン([+-]?\d+)\/([+-]?\d+)（(.+)）$/, (_, c, a, b, pt) => `${c} gets ${a}/${b} this turn (${pt})`],
+    [/^(.+)のダメージを取り除いた$/, (_, c) => `Removed damage from ${c}`],
+    [/^与ダメージ (\d+)$/, (_, n) => `Dealt ${n}`],
+    [/^(.+)で(.+)をブロック$/, (_, a, b) => `${a} blocks ${b}`],
     [/^(\d+)枚引いた$/, (_, n) => `Drew ${cards(n)}`],
     [/^(.+)で攻撃(（タップしない）)?$/, (_, c, v) => `${c} attacks${v ? ' (without tapping)' : ''}`],
     [/^(.+)の攻撃を取り消し$/, (_, c) => `${c} no longer attacking`],
@@ -187,8 +222,10 @@
     [/^キープ（マリガン(\d+)回）$/, (_, n) => `Kept (${n} mulligan${n === '1' ? '' : 's'})`],
     [/^マリガン（(\d+)回目）$/, (_, n) => `Mulligan (#${n})`],
     [/^マリガン(\d+)回目の手札$/, (_, n) => `Hand after mulligan #${n}`],
+    [/^キープすると、手札から(\d+)枚をライブラリーの一番下に置きます（手札(\d+)枚で開始）$/, (_, n, h) => `If you keep, put ${cards(n)} from your hand on the bottom of your library (start with ${cards(h)})`],
+    [/^ライブラリーの一番下に置くカードを選択（あと(\d+)枚）$/, (_, n) => `Choose cards to put on the bottom of your library (${n} more)`],
     [/^このターンはすでに土地を(\d+)枚プレイしています。それでも出しますか？$/, (_, n) => `You have already played ${n} land${n === '1' ? '' : 's'} this turn. Play it anyway?`],
-    [/^クリンナップ：手札が(\d+)枚になるまで、捨てるカードを手札からあと(\d+)枚クリックしてください$/, (_, h, n) => `Cleanup: click ${cards(n)} in your hand to discard down to ${h}`],
+    [/^クリーンアップ：手札が(\d+)枚になるまで、捨てるカードを手札からあと(\d+)枚クリックしてください$/, (_, h, n) => `Cleanup: click ${cards(n)} in your hand to discard down to ${h}`],
     [/^手札が(\d+)枚：(\d+)枚捨ててください$/, (_, h, n) => `${cards(h)} in hand: discard ${n}`],
     [/^手札が多すぎます。(\d+)枚捨ててください。$/, (_, n) => `Too many cards in hand. Discard ${n}.`],
     [/^手札調整をスキップ（手札(\d+)枚）$/, (_, n) => `Skipped discarding (${cards(n)} in hand)`],
@@ -209,7 +246,7 @@
     [/^部屋 (\S+) を作りました。この部屋コードを相手に伝えてください$/, (_, c) => `Created room ${c}. Share this room code with your opponent`],
     [/^Magic: The Gathering System の部屋コード：(.+)$/, (_, c) => `Magic: The Gathering System room code: ${c}`],
     [/^一人回し・対戦 — (.+)$/, (_, t) => `Solo / Match — ${t}`],
-    [/^戦場の色：(.)$/, (_, c) => `Battlefield color: ${T(c)}`],
+    [/^戦場の背景：(.+)$/, (_, c) => `Battlefield: ${T(c)}`],
     // 通信
     [/^対戦中（部屋 (\S+)・同じPC）$/, (_, c) => `In a match (room ${c}, same PC)`],
     [/^対戦中（部屋 (\S+)）$/, (_, c) => `In a match (room ${c})`],
@@ -325,9 +362,11 @@
   window.alert = (msg) => nativeAlert(translate(String(msg ?? '')));
 
   // ---------- 国旗のボタン ----------
+  // 1つの丸いボタンに今の言語の国旗を出し、押すともう一方の言語に切り替える
   const FLAGS = {
-    ja: '<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#fff"/><circle cx="15" cy="10" r="6" fill="#bc002d"/></svg>',
-    en: '<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#b22234"/>'
+    ja: '<svg viewBox="0 0 30 20" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="30" height="20" fill="#fff"/><circle cx="15" cy="10" r="6" fill="#bc002d"/></svg>',
+    // 丸く切り抜いても星の部分が見えるよう、左寄せで切り抜く
+    en: '<svg viewBox="0 0 30 20" preserveAspectRatio="xMinYMid slice" aria-hidden="true"><rect width="30" height="20" fill="#b22234"/>'
       + [1, 3, 5, 7, 9, 11].map((k) => `<rect y="${(k * 20 / 13).toFixed(2)}" width="30" height="${(20 / 13).toFixed(2)}" fill="#fff"/>`).join('')
       + '<rect width="13" height="10.77" fill="#3c3b6e"/>'
       + [2, 5, 8].flatMap((y) => [2, 5, 8, 11].map((x) => `<circle cx="${x - 0.5 + (y === 5 ? 1.5 : 0)}" cy="${y}" r="0.7" fill="#fff"/>`)).join('')
@@ -341,25 +380,30 @@
     observer?.disconnect();
     walk(document.body);
     doTitle();
+    renderPickers();
     observe();
-    for (const b of document.querySelectorAll('.lang-btn')) b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
+  }
+
+  // 名前は両方の言語で併記する（言語の切り替えで置き換えない）
+  const LABEL = { ja: '日本語 → English', en: 'English → 日本語' };
+
+  function renderPickers() {
+    for (const b of document.querySelectorAll('.lang-btn')) {
+      b.innerHTML = FLAGS[lang];
+      b.title = LABEL[lang];
+      b.setAttribute('aria-label', LABEL[lang]);
+    }
   }
 
   function buildPickers() {
     for (const box of document.querySelectorAll('.lang-picker')) {
-      for (const [code, name] of [['ja', '日本語'], ['en', 'English']]) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'lang-btn';
-        b.dataset.lang = code;
-        b.innerHTML = FLAGS[code];
-        b.setAttribute('aria-label', name);
-        b.setAttribute('aria-pressed', String(code === lang));
-        b.addEventListener('click', () => setLang(code));
-        box.append(b);
-      }
-      box.setAttribute('role', 'group');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lang-btn';
+      b.addEventListener('click', () => setLang(lang === 'ja' ? 'en' : 'ja'));
+      box.append(b);
     }
+    renderPickers();
   }
 
   function start() {

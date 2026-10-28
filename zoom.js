@@ -1,5 +1,5 @@
 // スマホ：カードの長押しで拡大表示（両画面の <head> で読み込む）
-// onLongPress(el, fn)：タッチの長押し。showCardDetail({ name, image }, [[ボタン名, fn], ...])：拡大表示
+// onLongPress(el, fn)：タッチの長押し。showCardDetail({ name, image, text }, [[ボタン名, fn], ...])：拡大表示
 (function () {
   // 長押し（タッチのみ）。長押し後に続けて起きる click は無視する
   function onLongPress(el, fn) {
@@ -37,7 +37,7 @@
   function build() {
     dialog = document.createElement('dialog');
     dialog.className = 'card-detail';
-    dialog.innerHTML = '<div class="card-detail-body"><div class="card-detail-card"></div><div class="name card-detail-name"></div><div class="card-detail-actions"></div></div>';
+    dialog.innerHTML = '<div class="card-detail-body"><div class="card-detail-card"></div><div class="name card-detail-name"></div><div class="name card-detail-text"></div><div class="card-detail-actions"></div></div>';
     // ボタン以外のどこを押しても閉じる
     dialog.addEventListener('click', (e) => {
       if (!e.target.closest('.card-detail-actions button')) dialog.close();
@@ -63,6 +63,8 @@
       box.replaceChildren(text);
     }
     dialog.querySelector('.card-detail-name').textContent = card.name;
+    // タイプ・効果テキスト・P/T（あれば）
+    dialog.querySelector('.card-detail-text').textContent = card.text ?? '';
     dialog.querySelector('.card-detail-actions').replaceChildren(...actions.map(([label, fn]) => {
       const b = document.createElement('button');
       b.type = 'button';

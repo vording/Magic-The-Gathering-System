@@ -4,17 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>一人回し・対戦 — Magic: The Gathering System</title>
-  <link rel="stylesheet" href="theme.css?v=15">
-  <link rel="stylesheet" href="play.css?v=28">
-  <script src="i18n.js?v=5"></script>
+  <link rel="stylesheet" href="theme.css?v=24">
+  <link rel="stylesheet" href="play.css?v=39">
+  <script src="i18n.js?v=14"></script>
   <script src="device.js?v=1"></script>
-  <script src="felt.js?v=4"></script>
-  <script src="zoom.js?v=1"></script>
+  <script src="felt.js?v=7"></script>
+  <script src="zoom.js?v=2"></script>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <h1 class="logo"><span class="logo-full">Magic: The Gathering <small>System</small></span><span class="logo-short">MTG System</span></h1>
+      <h1 class="logo"><img class="logo-img" src="img/logo.png" alt="Magic: The Gathering"><small>System</small></h1>
       <span class="game-title"><span id="deck-name"></span></span>
       <span id="net-status" class="net-status"></span>
       <span class="spacer"></span>
@@ -35,6 +35,7 @@
           <div class="status-line">
             <span id="turn-label" class="turn-label"></span>
             <span id="land-count" class="land-count" title="このターンにプレイした土地の数"></span>
+            <span id="dealt-count" class="land-count dealt-count" title="一人回しで相手に与えたダメージの合計"></span>
           </div>
           <p id="phase-hint" class="phase-hint"></p>
         </div>
@@ -50,34 +51,34 @@
       <aside class="col-player">
         <!-- 相手（ネット対戦のときだけ表示） -->
         <div id="opp-player" class="player-block opp" hidden>
-          <div class="avatar" aria-hidden="true"></div>
+          <div class="avatar" id="opp-avatar" aria-hidden="true"></div>
           <div class="player-name" id="opp-player-name"></div>
           <div class="life"><span id="opp-life" class="opp-life"></span></div>
           <div class="piles">
             <div class="pile static" title="ライブラリーの枚数">
-              <span class="pile-icon" aria-hidden="true">▤</span>
+              <span class="pile-icon icon-library" aria-hidden="true">▤</span>
               <span class="pile-count" id="opp-library-count"></span>
               <span class="pile-name">ライブラリー</span>
             </div>
             <div class="pile static" title="手札の枚数">
-              <span class="pile-icon" aria-hidden="true">✋</span>
+              <span class="pile-icon icon-hand" aria-hidden="true">✋</span>
               <span class="pile-count" id="opp-hand-count"></span>
               <span class="pile-name">手札</span>
             </div>
             <div class="pile" id="opp-pile-graveyard" title="墓地：クリックで一覧">
-              <span class="pile-icon" aria-hidden="true">✝</span>
+              <span class="pile-icon icon-graveyard" aria-hidden="true">✝</span>
               <span class="pile-count" id="opp-graveyard-count"></span>
               <span class="pile-name">墓地</span>
             </div>
             <div class="pile" id="opp-pile-exile" title="追放：クリックで一覧">
-              <span class="pile-icon" aria-hidden="true">◌</span>
+              <span class="pile-icon icon-exile" aria-hidden="true">◌</span>
               <span class="pile-count" id="opp-exile-count"></span>
               <span class="pile-name">追放</span>
             </div>
           </div>
         </div>
         <!-- 自分 -->
-        <div class="avatar" aria-hidden="true"></div>
+        <div class="avatar mine" id="my-avatar" title="クリックでアバターを変える"></div>
         <div class="player-name" id="my-player-name">あなた</div>
         <div class="life">
           <span id="life" title="クリックで数値を入力"></span>
@@ -88,17 +89,17 @@
         </div>
         <div class="piles">
           <div class="pile library" id="pile-library" data-zone="library" title="ライブラリー：クリックで1枚引く／右クリックでメニュー">
-            <span class="pile-icon" aria-hidden="true">▤</span>
+            <span class="pile-icon icon-library" aria-hidden="true">▤</span>
             <span class="pile-count" id="library-count"></span>
             <span class="pile-name">ライブラリー</span>
           </div>
           <div class="pile" id="pile-graveyard" data-zone="graveyard" title="墓地：クリックで一覧">
-            <span class="pile-icon" aria-hidden="true">✝</span>
+            <span class="pile-icon icon-graveyard" aria-hidden="true">✝</span>
             <span class="pile-count" id="graveyard-count"></span>
             <span class="pile-name">墓地</span>
           </div>
           <div class="pile" id="pile-exile" data-zone="exile" title="追放：クリックで一覧">
-            <span class="pile-icon" aria-hidden="true">◌</span>
+            <span class="pile-icon icon-exile" aria-hidden="true">◌</span>
             <span class="pile-count" id="exile-count"></span>
             <span class="pile-name">追放</span>
           </div>
@@ -190,7 +191,15 @@
         <label><input type="radio" name="mode" value="host"> ネット対戦：部屋を作る</label>
         <label><input type="radio" name="mode" value="join"> ネット対戦：部屋に入る
           <input id="room-code" name="room" type="text" placeholder="部屋コード" maxlength="12" class="room-code"></label>
-        <label class="field name-field">名前 <input id="player-name" name="name" type="text" maxlength="16"></label>
+        <div class="field name-field">
+          <label for="player-name">名前</label>
+          <input id="player-name" name="name" type="text" maxlength="16">
+          <button type="button" id="random-name" class="dice-btn" title="ランダムな名前" aria-label="ランダムな名前">🎲</button>
+        </div>
+      </fieldset>
+      <fieldset class="order well avatar-picker">
+        <legend>アバター</legend>
+        <div class="avatar-choices" id="avatar-choices"></div>
       </fieldset>
       <fieldset class="order well">
         <legend>順番</legend>
@@ -219,6 +228,21 @@
     </div>
   </dialog>
 
+  <dialog id="combat" class="combat">
+    <h2 class="panel-head">戦闘ダメージ</h2>
+    <div class="dialog-body">
+      <ul id="combat-attacks" class="combat-list"></ul>
+      <h3 class="combat-sub">結果</h3>
+      <ul id="combat-results" class="combat-list results"></ul>
+      <ul id="combat-notes" class="combat-list notes"></ul>
+      <p class="hint">キーワード能力（先制攻撃・二段攻撃・トランプル・接死・絆魂・破壊不能）だけを計算しています。ほかの効果は「適用しない」で閉じて手で処理してください。</p>
+      <div class="dialog-actions">
+        <button id="combat-skip">適用しない</button>
+        <button id="combat-apply" class="primary">適用</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="result" class="result">
     <div class="dialog-body">
       <p id="result-title" class="result-title"></p>
@@ -235,6 +259,6 @@
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <script src="sound.js?v=2"></script>
   <script src="net.js?v=2"></script>
-  <script src="play.js?v=14"></script>
+  <script src="play.js?v=23"></script>
 </body>
 </html>

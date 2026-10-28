@@ -27,7 +27,7 @@
 .search-form input { flex: 1; min-width: 0; }
 .status { margin: 6px 0; color: var(--muted); }
 
-/* 検索結果はフェルトの上に並べる（戦場の色と連動） */
+/* 検索結果はグレーの岩肌の上に並べる（戦場の背景とは連動しない） */
 .results {
   flex: 1;
   display: grid;
@@ -37,7 +37,7 @@
   min-height: 0;
   overflow: auto;
   padding: 10px;
-  background: var(--felt);
+  background: #4a4a48 url("img/bg-rock.jpg") center / cover no-repeat;
 }
 .result, .result:hover:not(:disabled), .result:active:not(:disabled) {
   position: relative;
