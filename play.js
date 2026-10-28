@@ -48,6 +48,14 @@ const PHASE_HINTS = {
   cleanup: 'クリンナップ・ステップ。',
 };
 
+// ネット対戦で、終えるときに相手の承認が必要なステップ（アンタップ・クリンナップでは呪文を唱えられない）
+const PRIORITY_PHASES = new Set(['upkeep', 'draw', 'main1', 'begincombat', 'attack', 'block', 'damage', 'endcombat', 'main2', 'end']);
+const AUTOPASS_KEY = 'mtg-deckmaker-autopass';
+
+// 負けた理由 → 表示（自分が負けたとき／相手が負けたとき）
+const LOSE_TEXT = { life: 'ライフが0になりました', deck: 'ライブラリーが空の状態でカードを引こうとしました', concede: '投了しました' };
+const WIN_TEXT = { life: '相手のライフが0になりました', deck: '相手のライブラリーが空の状態でカードを引こうとしました', concede: '相手が投了しました' };
+
 const ZONES = { library: 'ライブラリー', hand: '手札', battlefield: '戦場', graveyard: '墓地', exile: '追放' };
 
 const $ = (id) => document.getElementById(id);
@@ -71,9 +79,19 @@ let opp = null;
 let chat = loadJson(sessionStorage, CHAT_KEY) ?? [];
 // 接続情報 { role: 'host' | 'guest', code }（再読み込みしても同じ部屋に戻る）
 let netInfo = loadJson(sessionStorage, NET_KEY);
-// 部屋に入る側が、先手後手を受け取る前にゲームを始めた場合の保留
-let pendingHostOnDraw = null;
+// 部屋に入る側：部屋を作った側から届いた最新のゲーム { onDraw: 作った側が後手か, matchId }
+let pendingHost = null;
+// 部屋に入る側：まだ合わせていない新しいゲームのターンが先に届いた場合の matchId
+let earlyPass = null;
 let clearHistoryAfterAct = false;
+// 自分のターン：相手の承認を待っている進行 { id, from, to, end: ターン終了か, held: 相手が対応中か }
+let outgoing = null;
+// 相手のターン：相手から届いた承認の依頼（形は outgoing と同じ）
+let incoming = null;
+// このステップを終える依頼には自動で OK する（フェイズID）
+let autoPass = new Set(loadJson(localStorage, AUTOPASS_KEY) ?? []);
+// 表示済みの勝敗（同じ結果でダイアログを何度も開かない）
+let shownResult = null;
 
 function loadJson(store, key) {
   try { return JSON.parse(store.getItem(key)); } catch { return null; }
@@ -97,38 +115,7 @@ const online = () => Net.active;
 // device.js が判定する（読み込まれていなければ PC 扱い）
 const phone = () => window.isPhone?.() ?? false;
 
-// 長押し（タッチのみ）。長押し後に続けて起きる click は無視する
-function onLongPress(el, fn) {
-  let timer = null;
-  let sx = 0;
-  let sy = 0;
-  el.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') return;
-    // 端末によっては長押しの後に click が起きないので、次に触れたときに印を消す
-    delete el.dataset.longpress;
-    sx = e.clientX;
-    sy = e.clientY;
-    timer = setTimeout(() => {
-      timer = null;
-      el.dataset.longpress = '1';
-      fn(e);
-    }, 450);
-  });
-  const cancel = () => { clearTimeout(timer); timer = null; };
-  el.addEventListener('pointermove', (e) => {
-    if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel();
-  });
-  el.addEventListener('pointerup', cancel);
-  el.addEventListener('pointercancel', cancel);
-  el.addEventListener('click', (e) => {
-    if (!el.dataset.longpress) return;
-    delete el.dataset.longpress;
-    e.stopImmediatePropagation();
-    e.preventDefault();
-  }, true);
-}
-
-// スマホでは長押しで出すので、ブラウザ標準の長押しメニューは止める
+// スマホでは長押しで出すので、ブラウザ標準の長押しメニューは止める（onLongPress は zoom.js）
 function onContextMenu(el, fn) {
   el.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -163,12 +150,45 @@ function cardFrom(card, iid) {
     image: card.pick?.image ?? ja?.image ?? card.image,
     isLand: /\bLand\b/.test((card.typeLine ?? '').split('//')[0]),
     isCreature: /\bCreature\b/.test(card.typeLine ?? ''),
+    kind: cardKind(card.typeLine),
+    mana: manaColors(card),
     tapped: false,
     counters: 0,
   };
 }
 
+// 効果音を選ぶためのカードの種類（表面のタイプ行で判定）
+function cardKind(typeLine = '') {
+  const front = typeLine.split('//')[0];
+  return ['Land', 'Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment']
+    .find((t) => new RegExp(`\\b${t}\\b`).test(front))?.toLowerCase() ?? 'other';
+}
+
+// 土地が出せるマナの色（Scryfall の produced_mana。ない古いデータは基本土地タイプから判定）
+const BASIC_TYPES = { Plains: 'W', Island: 'U', Swamp: 'B', Mountain: 'R', Forest: 'G' };
+function manaColors(card) {
+  if (Array.isArray(card.produced)) return card.produced.filter((c) => 'WUBRG'.includes(c));
+  const front = (card.typeLine ?? '').split('//')[0];
+  return Object.entries(BASIC_TYPES).filter(([t]) => new RegExp(`\\b${t}\\b`).test(front)).map(([, c]) => c);
+}
+
+// カードの移動に合わせた効果音（戦場に出たときはカードの種類、土地はマナの色で変える）
+function moveSound(card, from, to) {
+  if (to === 'battlefield') {
+    if (card.isLand) return Sound.landName(card.mana ?? []);
+    return { artifact: 'artifact', enchantment: 'enchant' }[card.kind] ?? 'summon';
+  }
+  if (to === 'exile') return 'exile';
+  if (to === 'graveyard') {
+    if (from === 'battlefield') return 'destroy';
+    if (from === 'hand') return { instant: 'instant', sorcery: 'sorcery' }[card.kind] ?? 'discard';
+    return 'discard';
+  }
+  return null;
+}
+
 function newGame(deck, onDraw, random = false) {
+  const prevMatchId = game?.matchId ?? null;
   const cards = {};
   const library = [];
   let iid = 0;
@@ -197,12 +217,16 @@ function newGame(deck, onDraw, random = false) {
     waiting: false,
     orderFixed: !online() || Net.role === 'host',
     passReceived: false,
+    // ネット対戦の1ゲームを表すID（部屋を作った側が決め、入った側はそれに合わせる）
+    matchId: online() && Net.role === 'host' ? Math.random().toString(36).slice(2) : null,
+    // 入った側：直前のゲームの matchId（終わったゲームの先手後手やターンを使わないため）
+    prevMatchId,
   };
-  if (online() && Net.role === 'guest' && pendingHostOnDraw !== null) {
-    game.onDraw = !pendingHostOnDraw;
-    game.orderFixed = true;
-  }
+  if (online() && Net.role === 'guest' && isNewHostGame(pendingHost)) adoptHostOrder(pendingHost);
   history = [];
+  outgoing = null;
+  incoming = null;
+  shownResult = null;
   log(`「${deck.name}」で開始${game.orderFixed ? `（${random ? 'ランダムで' : ''}${game.onDraw ? '後手' : '先手'}）` : ''}`);
   drawCards(7, false);
   render();
@@ -234,6 +258,7 @@ function netUpdate(fn) {
 function undo() {
   const prev = history.pop();
   if (!prev) return;
+  Sound.play('cancel');
   game = JSON.parse(prev);
   render();
 }
@@ -254,6 +279,8 @@ function moveCard(iid, to, { bottom = false, silent = false } = {}) {
   if (!from) return;
   const card = game.cards[iid];
   game.zones[from] = game.zones[from].filter((x) => x !== iid);
+  const sound = moveSound(card, from, to);
+  if (sound) Sound.play(sound);
   if (card.token && to !== 'battlefield') {
     delete game.cards[iid];
     if (!silent) log(`${card.name}（トークン）が消滅`);
@@ -276,14 +303,25 @@ function moveCard(iid, to, { bottom = false, silent = false } = {}) {
 function drawCards(n, withLog = true) {
   let drawn = 0;
   for (; drawn < n && game.zones.library.length; drawn++) game.zones.hand.push(game.zones.library.shift());
+  if (withLog && drawn) Sound.play('draw');
   if (withLog) log(drawn ? `${drawn}枚引いた` : 'ライブラリーが空で引けない');
+  if (drawn < n && started()) lose('deck');
+}
+
+// 負け（理由は LOSE_TEXT のキー）。勝ちは相手の snapshot の result から判定する
+function lose(reason) {
+  if (game.result) return;
+  game.result = { reason };
+  log(`敗北：${LOSE_TEXT[reason]}`);
 }
 
 function untapAll() {
+  if (game.zones.battlefield.some((iid) => game.cards[iid].tapped)) Sound.play('untap');
   for (const iid of game.zones.battlefield) game.cards[iid].tapped = false;
 }
 
 function startTurnOne() {
+  if (online()) Sound.play('myturn');
   game.turn = 1;
   game.landsPlayed = 0;
   game.phase = 'main1';
@@ -292,6 +330,8 @@ function startTurnOne() {
 }
 
 function beginTurn() {
+  // 一人回しは自分のターンの終わり、ネット対戦は相手からターンが回ってきたとき
+  Sound.play(online() ? 'myturn' : 'endturn');
   game.turn++;
   game.landsPlayed = 0;
   game.pendingEndTurn = false;
@@ -305,6 +345,7 @@ function stepPhase() {
   if (game.toDiscard > 0) return; // 手札を捨て終わるまで進めない
   const i = PHASES.findIndex(([id]) => id === game.phase);
   if (i === PHASES.length - 1) return online() ? passTurn() : beginTurn();
+  Sound.play('phase');
   game.phase = PHASES[i + 1][0];
   if (game.phase === 'draw') drawCards(1);
   if (game.phase === 'endcombat') clearAttackers();
@@ -326,6 +367,7 @@ function createToken(name, image = null) {
   const iid = game.nextIid++;
   game.cards[iid] = { iid, name, image, isLand: false, isCreature: true, tapped: false, counters: 0, token: true };
   game.zones.battlefield.push(iid);
+  Sound.play('summon');
   log(`${name}（トークン）を生成`);
 }
 
@@ -336,6 +378,7 @@ function mulligan() {
     game.zones.library.push(...game.zones.hand);
     game.zones.hand = [];
     shuffle(game.zones.library);
+    Sound.play('shuffle');
     game.mulligans++;
     drawCards(7, false);
     log(`マリガン（${game.mulligans}回目）`);
@@ -344,6 +387,7 @@ function mulligan() {
 
 function keep() {
   act(() => {
+    Sound.play('button');
     log(`キープ（マリガン${game.mulligans}回）`);
     game.toBottom = Math.min(game.mulligans, game.zones.hand.length);
     game.phase = 'keep';
@@ -414,12 +458,34 @@ function passTurn() {
   game.pendingEndTurn = false;
   clearAttackers();
   game.waiting = true;
+  outgoing = null;
+  Sound.play('endturn');
   log('ターン終了（相手のターンへ）');
-  game.passSent = Net.send({ type: 'pass' });
+  game.passSent = Net.send({ type: 'pass', matchId: game.matchId });
   clearHistoryAfterAct = true;
 }
 
-function receivePass() {
+// 部屋に入る側：部屋を作った側の新しいゲームか（matchId がなければ古い版の相手なので常に合わせる）
+function isNewHostGame(h) {
+  if (!h) return false;
+  if (h.matchId == null) return !game.orderFixed;
+  return h.matchId !== game.prevMatchId && (!game.orderFixed || h.matchId !== game.matchId);
+}
+
+function adoptHostOrder(h) {
+  if (game.matchId !== h.matchId) game.passReceived = h.matchId != null && earlyPass === h.matchId;
+  game.onDraw = !h.onDraw;
+  game.orderFixed = true;
+  game.matchId = h.matchId;
+}
+
+function receivePass(msg) {
+  // 前のゲームのターン終了は無視する（入った側がまだ合わせていない新しいゲームの分は覚えておく）
+  if (msg.matchId && msg.matchId !== game.matchId && (game.matchId || msg.matchId === game.prevMatchId)) {
+    if (Net.role === 'guest' && msg.matchId === pendingHost?.matchId) earlyPass = msg.matchId;
+    return;
+  }
+  incoming = null;
   netUpdate(() => {
     if (game.turn === 0) {
       game.passReceived = true;
@@ -435,6 +501,7 @@ function receivePass() {
 // 通信の不具合などで止まったときに、自分のターンを強制的に始める
 function forceMyTurn() {
   if (!game) return;
+  incoming = null;
   act(() => {
     game.waiting = false;
     log('自分のターンを開始（手動）');
@@ -452,12 +519,14 @@ function toggleAttack(iid, { vigilance = false } = {}) {
       c.attacking = false;
       if (!c.vigilance) c.tapped = false;
       c.vigilance = false;
+      Sound.play('cancel');
       log(`${c.name}の攻撃を取り消し`);
       return;
     }
     c.attacking = true;
     c.vigilance = vigilance;
     if (!vigilance) c.tapped = true;
+    Sound.play('attack');
     log(`${c.name}で攻撃${vigilance ? '（タップしない）' : ''}`);
   });
 }
@@ -497,6 +566,11 @@ function goToPhase(target) {
   // 対戦中は今より前のフェイズには進めない（ターンの終わりを越えると相手にターンが渡るため）
   const index = (id) => PHASES.findIndex(([p]) => p === id);
   if (online() && index(target) <= index(game.phase)) return;
+  if (needsApproval()) return requestAdvance(target);
+  doGoToPhase(target);
+}
+
+function doGoToPhase(target) {
   act(() => {
     let guard = 0;
     do stepPhase(); while (game.phase !== target && ++guard < PHASES.length + 1);
@@ -504,11 +578,20 @@ function goToPhase(target) {
 }
 
 function nextPhase() {
-  if (myTurn()) act(stepPhase);
+  if (!myTurn()) return;
+  if (needsApproval() && !(game.toDiscard > 0)) {
+    return requestAdvance(PHASES[PHASES.findIndex(([id]) => id === game.phase) + 1][0]);
+  }
+  act(stepPhase);
 }
 
 function endTurn() {
   if (!myTurn() || game.toDiscard > 0) return;
+  if (needsApproval()) return requestAdvance('cleanup', true);
+  doEndTurn();
+}
+
+function doEndTurn() {
   act(() => {
     if (game.phase !== 'cleanup') {
       game.phase = 'cleanup';
@@ -520,12 +603,113 @@ function endTurn() {
   });
 }
 
+// ---------- 相手の承認（ネット対戦） ----------
+// インスタントを唱えられるステップを終えるときは、相手が「OK」を押すまで進まない
+
+const needsApproval = () => online() && Net.connected() && myTurn() && PRIORITY_PHASES.has(game.phase);
+
+function requestAdvance(to, end = false) {
+  if (outgoing) return;
+  outgoing = { id: Math.random().toString(36).slice(2), from: game.phase, to, end, held: false };
+  Net.send({ type: 'priority', id: outgoing.id, from: outgoing.from, to, end });
+  render();
+}
+
+function cancelRequest() {
+  if (!outgoing) return;
+  Net.send({ type: 'priorityCancel', id: outgoing.id });
+  outgoing = null;
+  render();
+}
+
+function onApproved(id) {
+  const req = outgoing;
+  if (!game || req?.id !== id) return;
+  outgoing = null;
+  // 待っている間にフェイズが変わっていたら（手動で進めたなど）何もしない
+  if (!myTurn() || game.phase !== req.from) return render();
+  if (req.end) doEndTurn();
+  else doGoToPhase(req.to);
+}
+
+function receiveRequest(msg) {
+  incoming = { id: msg.id, from: msg.from, to: msg.to, end: !!msg.end, held: false };
+  if (autoPass.has(msg.from)) return approveRequest();
+  Sound.play('button');
+  render();
+}
+
+function approveRequest() {
+  if (!incoming) return;
+  Net.send({ type: 'priorityOk', id: incoming.id });
+  incoming = null;
+  render();
+}
+
+// 「対応する」：相手に待ってもらう（インスタントを唱えるなど。終わったら OK を押す）
+function holdRequest() {
+  if (!incoming || incoming.held) return;
+  incoming.held = true;
+  Net.send({ type: 'priorityHold', id: incoming.id });
+  render();
+}
+
+function setAutoPass(phase, on) {
+  if (on) autoPass.add(phase);
+  else autoPass.delete(phase);
+  saveJson(localStorage, AUTOPASS_KEY, [...autoPass]);
+  render();
+}
+
+const requestText = (r) => `${phaseName(r.from)}を終えて${r.end ? 'ターンを終了' : `${phaseName(r.to)}へ`}`;
+
 function toggleTap(iid) {
   act(() => {
     const c = game.cards[iid];
     c.tapped = !c.tapped;
+    Sound.play(c.tapped ? 'tap' : 'untap');
     log(`${c.name}を${c.tapped ? 'タップ' : 'アンタップ'}`);
   });
+}
+
+function setLife(v) {
+  if (v === game.life) return;
+  Sound.play(v < game.life ? 'lifeloss' : 'lifegain');
+  game.life = v;
+  log(`ライフ ${v}`);
+  if (v <= 0) lose('life');
+  // 入力の間違いなどでライフを戻したときは、ライフによる負けを取り消す
+  else if (game.result?.reason === 'life') game.result = null;
+}
+
+function concede() {
+  if (!game || game.result || !confirm('投了しますか？')) return;
+  act(() => lose('concede'));
+}
+
+// 表示する勝敗 { win, text }。自分の負けを優先し、ネット対戦では相手の負け＝自分の勝ち
+function currentResult() {
+  if (game?.result) return { win: false, text: LOSE_TEXT[game.result.reason] };
+  const o = online() && game && opp?.state?.result;
+  if (o) return { win: true, text: WIN_TEXT[o.reason] ?? '' };
+  return null;
+}
+
+function showResultIfNew() {
+  const r = currentResult();
+  const key = r ? `${r.win}:${r.text}` : null;
+  if (key === shownResult) return;
+  shownResult = key;
+  const dlg = $('result');
+  if (!r) {
+    if (dlg.open) dlg.close();
+    return;
+  }
+  Sound.play(r.win ? 'win' : 'lose');
+  $('result-title').textContent = r.win ? '勝利' : '敗北';
+  $('result-text').textContent = r.text;
+  dlg.dataset.win = String(r.win);
+  if (!dlg.open) dlg.showModal();
 }
 
 function askNumber(message, initial = '1') {
@@ -555,9 +739,11 @@ function render() {
     b.addEventListener('click', () => goToPhase(id));
     return b;
   }));
-  for (const id of ['next-phase', 'end-turn']) $(id).disabled = !myTurn() || game.toDiscard > 0;
+  const canAdvance = myTurn() && !(game.toDiscard > 0) && !outgoing;
+  for (const id of ['next-phase', 'end-turn']) $(id).disabled = !canAdvance;
   $('phase-current').textContent = `${phaseName(game.phase) || '—'} ▼`;
-  $('phase-current').disabled = !myTurn() || game.toDiscard > 0;
+  $('phase-current').disabled = !canAdvance;
+  $('autopass-reset').hidden = !online() || !autoPass.size;
   $('undo').disabled = !history.length;
 
   renderBanner();
@@ -578,6 +764,7 @@ function render() {
   renderLog();
   renderOpp();
   if (viewer) renderViewer();
+  showResultIfNew();
   scheduleSync();
 }
 
@@ -641,6 +828,37 @@ function renderBanner() {
     skip.textContent = '捨てずに続ける';
     skip.addEventListener('click', skipDiscard);
     bar.replaceChildren(label, skip);
+    return;
+  }
+  const span = (text) => Object.assign(document.createElement('span'), { textContent: text });
+  const button = (text, fn, primary = false) => {
+    const b = Object.assign(document.createElement('button'), { textContent: text, className: primary ? 'primary' : '' });
+    b.addEventListener('click', fn);
+    return b;
+  };
+  if (outgoing) {
+    bar.hidden = false;
+    bar.replaceChildren(
+      span(`相手の確認待ち（${requestText(outgoing)}）`),
+      ...(outgoing.held ? [span('相手が対応しています。終わるまでお待ちください')] : []),
+      button('取り消し', cancelRequest),
+    );
+    return;
+  }
+  if (incoming) {
+    bar.hidden = false;
+    const auto = document.createElement('label');
+    auto.className = 'autopass';
+    const box = Object.assign(document.createElement('input'), { type: 'checkbox', checked: autoPass.has(incoming.from) });
+    const from = incoming.from;
+    box.addEventListener('change', () => setAutoPass(from, box.checked));
+    auto.append(box, span('このステップは次から自動でOK'));
+    bar.replaceChildren(
+      span(`${oppName()}：${requestText(incoming)}`),
+      incoming.held ? span('対応中：終わったら「OK」を押してください') : button('対応する', holdRequest),
+      button('OK', approveRequest, true),
+      auto,
+    );
     return;
   }
   if (game.waiting || game.phase === 'ready') {
@@ -728,7 +946,12 @@ function cardEl(iid, zone) {
     el.addEventListener('click', (e) => openCardMenu(iid, e.clientX, e.clientY));
   }
   el.addEventListener('mouseenter', () => showPreview(c));
-  onContextMenu(el, (e) => openCardMenu(iid, e.clientX, e.clientY));
+  el.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (!phone()) openCardMenu(iid, e.clientX, e.clientY);
+  });
+  // スマホ：長押しで拡大表示（そこから操作のメニューも開ける）
+  onLongPress(el, () => showCardDetail(c, [['操作メニュー', () => openCardMenu(iid, 0, 0)]]));
   el.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', String(iid)));
   return el;
 }
@@ -770,8 +993,10 @@ function oppCardEl(c) {
     el.append(atk);
   }
   el.addEventListener('mouseenter', () => showPreview(c));
-  // スマホ：タップで拡大表示
-  el.addEventListener('click', () => { if (phone()) showMenu([], 0, 0, c); });
+  // スマホ：タップ・長押しで拡大表示
+  el.addEventListener('click', () => { if (phone()) showCardDetail(c); });
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+  onLongPress(el, () => showCardDetail(c));
   return el;
 }
 
@@ -824,6 +1049,7 @@ function snapshot() {
     graveyard: game.zones.graveyard.map(pub),
     exile: game.zones.exile.map(pub),
     log: game.log.slice(-150),
+    result: game.result ?? null,
   };
 }
 
@@ -840,6 +1066,9 @@ function sendHello() {
     name: myName(),
     // 先手・後手は部屋を作った側が決める（ゲーム開始前なら null）
     hostOnDraw: Net.role === 'host' && game ? !!game.onDraw : null,
+    matchId: Net.role === 'host' ? game?.matchId ?? null : null,
+    // 入った側が先手・後手を待っているときは、作った側に送り直してもらう
+    needOrder: Net.role === 'guest' && !!game && !game.orderFixed,
   });
 }
 
@@ -859,12 +1088,15 @@ function setupNet() {
     if (game) {
       Net.send({ type: 'state', state: snapshot() });
       // 切断中に渡せなかったターンを渡し直す
-      if (game.waiting && game.turn > 0 && !game.passSent) game.passSent = Net.send({ type: 'pass' });
+      if (game.waiting && game.turn > 0 && !game.passSent) game.passSent = Net.send({ type: 'pass', matchId: game.matchId });
     }
     if (game) render(); else renderOpp();
   });
   Net.on('close', () => {
     opp = { ...opp, connected: false };
+    // 承認のやり取りは切断で取り消す（つながっていない間は承認なしで進める）
+    outgoing = null;
+    incoming = null;
     systemMessage(`${oppName()}との接続が切れました`);
     if (game) render(); else renderOpp();
   });
@@ -872,12 +1104,13 @@ function setupNet() {
     const first = !opp?.name;
     opp = { ...opp, name: String(msg.name || '相手').slice(0, 16), connected: true };
     if (first) systemMessage(`${oppName()}が参加しました`);
+    if (Net.role === 'host' && msg.needOrder) sendHello();
     if (Net.role === 'guest' && msg.hostOnDraw !== null && msg.hostOnDraw !== undefined) {
-      pendingHostOnDraw = !!msg.hostOnDraw;
-      if (game && !game.orderFixed) {
+      pendingHost = { onDraw: !!msg.hostOnDraw, matchId: msg.matchId ?? null };
+      // 1ターン目が始まる前なら、部屋を作った側が始め直したゲームにも合わせる
+      if (game && game.turn === 0 && isNewHostGame(pendingHost)) {
         netUpdate(() => {
-          game.onDraw = !pendingHostOnDraw;
-          game.orderFixed = true;
+          adoptHostOrder(pendingHost);
           log(`先手・後手が決まりました：あなたは${game.onDraw ? '後手' : '先手'}`);
           tryFirstTurn();
         });
@@ -889,11 +1122,26 @@ function setupNet() {
   Net.on('state', (msg) => {
     opp = { ...opp, state: msg.state, connected: true };
     renderOpp();
+    showResultIfNew();
     renderLog();
     if (viewer?.opp) renderViewer();
   });
-  Net.on('pass', () => {
-    if (game) receivePass();
+  Net.on('pass', (msg) => {
+    if (game) receivePass(msg);
+  });
+  Net.on('priority', (msg) => {
+    if (game) receiveRequest(msg);
+  });
+  Net.on('priorityOk', (msg) => onApproved(msg.id));
+  Net.on('priorityHold', (msg) => {
+    if (outgoing?.id !== msg.id) return;
+    outgoing.held = true;
+    render();
+  });
+  Net.on('priorityCancel', (msg) => {
+    if (incoming?.id !== msg.id) return;
+    incoming = null;
+    render();
   });
   Net.on('chat', (msg) => {
     chat.push({ ts: Date.now(), who: 'opp', name: oppName(), text: String(msg.text).slice(0, 300) });
@@ -985,8 +1233,8 @@ function openCardMenu(iid, x, y) {
     }
     items.push(
       [c.tapped ? 'アンタップ' : 'タップ', () => toggleTap(iid)],
-      ['カウンター +1', () => act(() => { c.counters++; log(`${c.name}にカウンター（${c.counters}）`); })],
-      ['カウンター −1', () => act(() => { c.counters--; log(`${c.name}のカウンター（${c.counters}）`); })],
+      ['カウンター +1', () => act(() => { c.counters++; Sound.play('counter'); log(`${c.name}にカウンター（${c.counters}）`); })],
+      ['カウンター −1', () => act(() => { c.counters--; Sound.play('counter'); log(`${c.name}のカウンター（${c.counters}）`); })],
       ['このカードのトークン・コピーを出す', () => act(() => createToken(c.name, c.image))],
       '-',
     );
@@ -1026,6 +1274,7 @@ function drawOne() {
 function shuffleLibrary() {
   act(() => {
     shuffle(game.zones.library);
+    Sound.play('shuffle');
     log('ライブラリーをシャッフル');
   });
 }
@@ -1043,8 +1292,9 @@ function millTo(zone) {
 function lookTop() {
   const n = askNumber('上から何枚見ますか？', '3');
   if (!n) return;
-  act(() => log(`ライブラリーの上から${Math.min(n, game.zones.library.length)}枚を見た`));
-  openViewer('library', `ライブラリーの上から${n}枚（左が一番上）`, game.zones.library.slice(0, n));
+  const shown = Math.min(n, game.zones.library.length);
+  act(() => log(`ライブラリーの上から${shown}枚を見た`));
+  openViewer('library', `ライブラリーの上から${shown}枚（左が一番上）`, game.zones.library.slice(0, n));
 }
 
 function searchLibrary() {
@@ -1157,7 +1407,8 @@ function startFromSetup(e) {
     Net.stop();
     opp = null;
     chat = [];
-    pendingHostOnDraw = null;
+    pendingHost = null;
+    earlyPass = null;
     netInfo = { role: 'guest', code: Net.join(code) };
   }
   saveJson(sessionStorage, NET_KEY, netInfo);
@@ -1197,14 +1448,12 @@ function init() {
   $('restart').addEventListener('click', openSetup);
 
   for (const b of document.querySelectorAll('[data-life]')) {
-    b.addEventListener('click', () => act(() => {
-      game.life += Number(b.dataset.life);
-      log(`ライフ ${game.life}`);
-    }));
+    b.addEventListener('click', () => act(() => setLife(game.life + Number(b.dataset.life))));
   }
   $('life').addEventListener('click', () => {
+    if (!game) return;
     const v = Number.parseInt(prompt('ライフ', game.life) ?? '', 10);
-    if (Number.isFinite(v)) act(() => { game.life = v; log(`ライフ ${v}`); });
+    if (Number.isFinite(v)) act(() => setLife(v));
   });
 
   $('pile-library').addEventListener('click', drawOne);
@@ -1242,7 +1491,21 @@ function init() {
     closeViewer();
   });
 
+  // ゲームがないまま開始画面を閉じると操作できない画面が残るので、閉じさせない
+  $('setup').addEventListener('cancel', (e) => { if (!game) e.preventDefault(); });
+  $('setup').addEventListener('close', () => { if (!game) $('setup').showModal(); });
   $('setup-form').addEventListener('submit', startFromSetup);
+  $('concede').addEventListener('click', concede);
+  $('autopass-reset').addEventListener('click', () => {
+    autoPass.clear();
+    saveJson(localStorage, AUTOPASS_KEY, []);
+    render();
+  });
+  $('result-close').addEventListener('click', () => $('result').close());
+  $('result-again').addEventListener('click', () => {
+    $('result').close();
+    openSetup();
+  });
   for (const r of $('setup-form').elements.mode) r.addEventListener('change', updateSetupMode);
   $('chat-form').addEventListener('submit', sendChat);
   $('room-share').addEventListener('click', shareRoomCode);
@@ -1257,7 +1520,11 @@ function init() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') return hideMenu();
     if (document.querySelector('dialog[open]') || e.target.matches('input, select, textarea')) return;
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    // 相手から承認の依頼が来ているときは Space / Enter で OK
+    if (incoming && (e.key === ' ' || e.key === 'Enter')) {
+      e.preventDefault();
+      approveRequest();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
       e.preventDefault();
       undo();
     } else if (e.key === ' ') {
@@ -1266,7 +1533,7 @@ function init() {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       endTurn();
-    } else if (e.key === 'd' || e.key === 'D') {
+    } else if ((e.key === 'd' || e.key === 'D') && !e.ctrlKey && !e.metaKey && !e.altKey && started()) {
       drawOne();
     }
   });

@@ -39,20 +39,22 @@ const Net = (() => {
 
   // ---------- PeerJS ----------
 
+  // 部屋は1対1：新しい接続が開いたら古い接続と入れ替える
+  // （相手が再読み込みしたとき、古い接続の切断が検知されるまで待たずに再接続できるように）
   function attach(c) {
-    if (conn?.open && conn.raw !== c) {
-      c.on('open', () => c.close()); // すでに相手がいる部屋には入れない
-      return;
-    }
-    conn = { raw: c, open: false, send: (m) => c.send(m), close: () => c.close() };
+    const entry = { raw: c, open: false, send: (m) => c.send(m), close: () => c.close() };
+    if (!conn?.open) conn = entry;
     c.on('open', () => {
-      conn.open = true;
+      const old = conn;
+      conn = entry;
+      entry.open = true;
+      if (old && old !== entry) try { old.close(); } catch {}
       status(`対戦中（部屋 ${code}）`, 'ok');
       emit('open');
     });
-    c.on('data', (msg) => msg && typeof msg.type === 'string' && emit(msg.type, msg));
+    c.on('data', (msg) => conn === entry && msg && typeof msg.type === 'string' && emit(msg.type, msg));
     c.on('close', () => {
-      if (conn?.raw !== c) return;
+      if (conn !== entry) return;
       conn.open = false;
       status(role === 'host' ? `相手が切断しました。再接続を待っています（部屋 ${code}）` : '切断されました。再接続しています…', 'wait');
       emit('close');
@@ -105,10 +107,14 @@ const Net = (() => {
     const bc = new BroadcastChannel(PREFIX + code);
     const me = Math.random().toString(36).slice(2);
     let other = null;
+    const bye = () => { try { bc.postMessage({ type: '_bye', _from: me }); } catch {} };
     conn = {
       open: false,
       send: (m) => bc.postMessage({ ...m, _from: me }),
-      close: () => bc.close(),
+      close: () => {
+        removeEventListener('pagehide', bye);
+        bc.close();
+      },
     };
     bc.onmessage = ({ data }) => {
       if (!data || data._from === me) return;
@@ -130,7 +136,7 @@ const Net = (() => {
       }
       emit(data.type, data);
     };
-    addEventListener('pagehide', () => bc.postMessage({ type: '_bye', _from: me }));
+    addEventListener('pagehide', bye);
     status(role === 'host' ? `部屋 ${code} を作りました（同じPC）。相手の参加を待っています` : `部屋 ${code} に接続しています…`, 'wait');
     bc.postMessage({ type: '_ping', _from: me });
   }

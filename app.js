@@ -118,15 +118,21 @@ function slimCard(c) {
     typeLine: c.type_line ?? face.type_line ?? '',
     image: c.image_uris?.normal ?? face.image_uris?.normal ?? null,
     legalities: c.legalities,
+    // 土地を出したときの効果音（マナの色）に使う
+    produced: c.produced_mana ?? [],
     copyRule: copyRule(c.type_line ?? '', oracle),
     art: artMode(),
   };
 }
 
+// 枚数制限なし（デッキは JSON で保存するため、保存すると null になる Infinity は使わない）
+const UNLIMITED = 9999;
+const isBasicLand = (typeLine) => /\bBasic\b.*\bLand\b/.test(typeLine ?? '');
+
 // 基本土地や「好きな枚数入れてよい」カードの例外を判定
 function copyRule(typeLine, oracle) {
-  if (/\bBasic\b.*\bLand\b/.test(typeLine)) return Infinity;
-  if (/any number of cards named/i.test(oracle)) return Infinity;
+  if (isBasicLand(typeLine)) return UNLIMITED;
+  if (/any number of cards named/i.test(oracle)) return UNLIMITED;
   const m = oracle.match(/up to (\w+) cards named/i);
   if (m) return NUMBER_WORDS[m[1].toLowerCase()] ?? (Number(m[1]) || null);
   return null;
@@ -134,6 +140,8 @@ function copyRule(typeLine, oracle) {
 
 function maxCopies(card, fmt = currentFormat()) {
   if (card.copyRule != null) return card.copyRule;
+  // 以前のデータは基本土地の copyRule が null で保存されている
+  if (isBasicLand(card.typeLine)) return UNLIMITED;
   if (fmt.restricted?.includes(card.name)) return 1;
   if (card.legalities?.[fmt.id] === 'restricted') return 1;
   return fmt.copies;
@@ -250,6 +258,40 @@ async function refreshArt(cards) {
   } catch {}
 }
 
+// 以前に保存したデッキの土地に、出せるマナの色（produced）を補う
+async function fillProduced() {
+  const lands = allDeckCards().filter((c) => c.oracleId && c.produced === undefined && /\bLand\b/.test(c.typeLine));
+  if (!lands.length) return;
+  try {
+    await searchByOracleIds(lands, '', (found) => {
+      const byId = new Map(found.map((c) => [oracleIdOf(c), c.produced_mana ?? []]));
+      for (const card of allDeckCards()) {
+        if (card.produced === undefined && byId.has(card.oracleId)) card.produced = byId.get(card.oracleId);
+      }
+      saveState();
+    });
+  } catch {}
+}
+
+// 以前に保存したデッキは「好きな枚数入れてよい」カード（執拗なネズミなど）の制限が消えているので、
+// テキストを取り直して判定し直す（一度だけ）
+async function fixCopyRules() {
+  if (state.copyRulesFixed) return;
+  const cards = allDeckCards().filter((c) => c.oracleId && c.copyRule == null);
+  try {
+    await searchByOracleIds(cards, '', (found) => {
+      const byId = new Map(found.map((c) => [oracleIdOf(c), slimCard(c).copyRule]));
+      for (const card of allDeckCards()) {
+        if (card.copyRule == null && byId.has(card.oracleId)) card.copyRule = byId.get(card.oracleId);
+      }
+    });
+    state.copyRulesFixed = true;
+    saveState();
+    renderDeck();
+    renderResults();
+  } catch {}
+}
+
 // ---------- 絵柄の選択（カードごと） ----------
 
 // 選択中のカード名と、印刷一覧の次ページ
@@ -353,7 +395,9 @@ async function fetchOnce(url) {
     // レート制限（429）は CORS ヘッダーなしで返るため、ネットワークエラーとして見える
     throw new Error('Scryfall に接続できません。短時間に検索しすぎた場合は1分ほど待ってから再度お試しください');
   }
-  const data = await res.json();
+  // 障害時などは JSON でないページが返ることがある
+  const data = await res.json().catch(() => null);
+  if (!data) throw new Error(`Scryfall からの応答を読み取れませんでした（${res.status} ${res.statusText}）`);
   if (res.status === 404) return { data: [], total_cards: 0, has_more: false };
   if (!res.ok) throw new Error(data.details || res.statusText);
   return data;
@@ -797,6 +841,9 @@ async function runImport(e) {
 
 // ---------- 描画 ----------
 
+// 拡大表示に渡すカード（表示中の名前・画像）
+const detailOf = (card) => ({ name: nameOf(card), image: imageOf(card) });
+
 function renderResults() {
   const box = $('results');
   box.replaceChildren(...lastResults.map((card) => {
@@ -817,7 +864,15 @@ function renderResults() {
       btn.append(badge);
     }
     btn.addEventListener('click', () => addCard(card));
-    btn.addEventListener('contextmenu', (e) => { e.preventDefault(); removeCard(card.name); });
+    btn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      // スマホの長押しは拡大表示（減らすのは拡大表示のボタンから）
+      if (!window.isPhone?.()) removeCard(card.name);
+    });
+    onLongPress(btn, () => showCardDetail(detailOf(card), [
+      ['1枚追加', () => addCard(card)],
+      ['1枚減らす', () => removeCard(card.name)],
+    ]));
     return btn;
   }));
   $('more').hidden = !nextPage;
@@ -884,6 +939,11 @@ function renderRow({ card, qty }) {
   row.querySelector('.art').addEventListener('click', () => openArtPicker(card));
   row.querySelector('.minus').addEventListener('click', () => removeCard(card.name));
   row.querySelector('.plus').addEventListener('click', () => addCard(card));
+  // スマホ：カード名の長押しで拡大表示
+  onLongPress(row.querySelector('.name'), () => showCardDetail(detailOf(card), [
+    ['1枚追加', () => addCard(card)],
+    ['1枚減らす', () => removeCard(card.name)],
+  ]));
   row.addEventListener('mouseenter', () => {
     const image = imageOf(card);
     if (!image) return;
@@ -975,7 +1035,18 @@ function init() {
   $('search-form').addEventListener('submit', (e) => { e.preventDefault(); startSearch(); });
   $('more').addEventListener('click', () => {
     if (!nextPage) return;
-    loadPage(searchId, nextPage).catch((err) => ($('search-status').textContent = `エラー: ${err.message}`));
+    // 読み込み中にもう一度押されても同じページを二重に追加しないよう、先に消しておく
+    const url = nextPage;
+    nextPage = null;
+    $('more').hidden = true;
+    const id = searchId;
+    loadPage(id, url).catch((err) => {
+      if (id !== searchId) return;
+      $('search-status').textContent = `エラー: ${err.message}`;
+      // 失敗したページはもう一度押して読み込み直せるようにする
+      nextPage = url;
+      $('more').hidden = false;
+    });
   });
 
   $('export').addEventListener('click', () => copyExport($('export'), 'en'));
@@ -998,6 +1069,8 @@ function init() {
   validateDeck();
   localize(deckEntries().map((e) => e.card));
   refreshArt(allDeckCards());
+  fillProduced();
+  fixCopyRules();
 }
 
 init();

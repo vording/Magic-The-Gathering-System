@@ -54,6 +54,8 @@
     'Scryfall に接続できません。短時間に検索しすぎた場合は1分ほど待ってから再度お試しください': 'Cannot connect to Scryfall. If you searched too often, wait about a minute and try again.',
     'カード検索 ': 'Card Search ', 'デッキ（': 'Deck (', '枚）': ' cards)', '枚': 'cards',
     // 一人回し・対戦：画面
+    '操作メニュー': 'Actions', '1枚追加': 'Add 1', '1枚減らす': 'Remove 1',
+    '効果音：オン': 'Sound: On', '効果音：オフ': 'Sound: Off',
     '元に戻す': 'Undo', 'リスタート': 'Restart', 'ターン終了': 'End Turn', '次へ': 'Next', 'フェイズを選ぶ': 'Choose phase',
     'このターンにプレイした土地の数': 'Lands played this turn', 'あなた': 'You', 'プレイヤー': 'Player', '相手': 'Opponent',
     'クリックで数値を入力': 'Click to enter a value', 'ライフ −1': 'Life −1', 'ライフ ＋1': 'Life +1', 'ライフ': 'Life',
@@ -95,7 +97,16 @@
     '相手の接続を待っています（先手・後手は部屋を作った人が決めます）': 'Waiting for the opponent to connect (the room creator decides the play order)',
     '自分のターンを始める': 'Start my turn', '通信が止まったときなどに使います': 'Use this if the connection gets stuck',
     '相手のターンを待たずに、自分のターンを始めますか？': "Start your turn without waiting for the opponent's turn to end?",
-    '捨てずに続ける': 'Continue without discarding', '相手の参加を待っています': 'Waiting for an opponent to join',
+    '捨てずに続ける': 'Continue without discarding',
+    // 勝敗・承認
+    '勝利': 'Victory', '敗北': 'Defeat', 'もう一度': 'Play again', '投了': 'Concede', '投了しますか？': 'Concede this game?',
+    'ライフが0になりました': 'Your life reached 0', 'ライブラリーが空の状態でカードを引こうとしました': 'You tried to draw from an empty library',
+    '投了しました': 'You conceded', '相手のライフが0になりました': "The opponent's life reached 0",
+    '相手のライブラリーが空の状態でカードを引こうとしました': 'The opponent tried to draw from an empty library', '相手が投了しました': 'The opponent conceded',
+    '取り消し': 'Cancel', '対応する': 'Respond', 'このステップは次から自動でOK': 'Auto-OK this step from now on',
+    '相手が対応しています。終わるまでお待ちください': 'The opponent is responding. Please wait',
+    '対応中：終わったら「OK」を押してください': 'Responding: press "OK" when done',
+    '自動OKをすべて解除': 'Clear all auto-OK', '相手のステップを自動でOKする設定をすべて解除': "Clear all auto-OK settings for the opponent's steps", '相手の参加を待っています': 'Waiting for an opponent to join',
     // メニュー・ログ
     '戦場へ': 'To battlefield', '手札へ': 'To hand', '墓地へ': 'To graveyard', '追放へ': 'To exile',
     'ライブラリーの一番上へ': 'To top of library', 'ライブラリーの一番下へ': 'To bottom of library',
@@ -158,6 +169,9 @@
     [/^ターン(\d+)開始$/, (_, n) => `Turn ${n} begins`],
     [/^土地 (\d+)\/(\d+)$/, (_, a, b) => `Lands ${a}/${b}`],
     [/^ライフ (-?\d+)$/, (_, n) => `Life ${n}`],
+    [/^敗北：(.+)$/, (_, r) => `Defeat: ${T(r)}`],
+    [new RegExp(`^相手の確認待ち（${PHASE_RE}を終えて(?:${PHASE_RE}へ|(ターンを終了))）$`), (_, f, t, end) => `Waiting for the opponent's OK (leave ${T(f)} → ${end ? 'end turn' : T(t)})`],
+    [new RegExp(`^(.+)：${PHASE_RE}を終えて(?:${PHASE_RE}へ|(ターンを終了))$`), (_, p, f, t, end) => `${T(p)}: leaving ${T(f)} → ${end ? 'end turn' : T(t)}`],
     [/^(\d+)枚引いた$/, (_, n) => `Drew ${cards(n)}`],
     [/^(.+)で攻撃(（タップしない）)?$/, (_, c, v) => `${c} attacks${v ? ' (without tapping)' : ''}`],
     [/^(.+)の攻撃を取り消し$/, (_, c) => `${c} no longer attacking`],
@@ -305,7 +319,8 @@
   const nativePrompt = window.prompt.bind(window);
   const nativeConfirm = window.confirm.bind(window);
   const nativeAlert = window.alert.bind(window);
-  window.prompt = (msg, def) => nativePrompt(translate(String(msg ?? '')), def === undefined ? def : translate(String(def)));
+  // 初期値はデッキ名など利用者が入れた文字なので訳さない
+  window.prompt = (msg, def) => nativePrompt(translate(String(msg ?? '')), def);
   window.confirm = (msg) => nativeConfirm(translate(String(msg ?? '')));
   window.alert = (msg) => nativeAlert(translate(String(msg ?? '')));
 

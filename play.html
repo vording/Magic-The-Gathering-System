@@ -4,11 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>一人回し・対戦 — Magic: The Gathering System</title>
-  <link rel="stylesheet" href="theme.css?v=14">
-  <link rel="stylesheet" href="play.css?v=27">
-  <script src="i18n.js?v=1"></script>
+  <link rel="stylesheet" href="theme.css?v=15">
+  <link rel="stylesheet" href="play.css?v=28">
+  <script src="i18n.js?v=5"></script>
   <script src="device.js?v=1"></script>
   <script src="felt.js?v=4"></script>
+  <script src="zoom.js?v=1"></script>
 </head>
 <body>
   <div class="app">
@@ -151,6 +152,9 @@
             <button id="mill">上から墓地へ</button>
             <button id="untap-all">すべてアンタップ</button>
             <button id="token">トークンを出す</button>
+            <button type="button" data-sound-toggle>効果音：オン</button>
+            <button id="autopass-reset" hidden title="相手のステップを自動でOKする設定をすべて解除">自動OKをすべて解除</button>
+            <button id="concede">投了</button>
             <div class="felt-picker tools-felt"></div>
             <div class="lang-picker tools-lang"></div>
           </div>
@@ -215,10 +219,22 @@
     </div>
   </dialog>
 
+  <dialog id="result" class="result">
+    <div class="dialog-body">
+      <p id="result-title" class="result-title"></p>
+      <p id="result-text" class="result-text"></p>
+      <div class="dialog-actions">
+        <button id="result-close">閉じる</button>
+        <button id="result-again" class="primary">もう一度</button>
+      </div>
+    </div>
+  </dialog>
+
   <div id="menu" class="menu" hidden></div>
 
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
-  <script src="net.js?v=1"></script>
-  <script src="play.js?v=10"></script>
+  <script src="sound.js?v=2"></script>
+  <script src="net.js?v=2"></script>
+  <script src="play.js?v=14"></script>
 </body>
 </html>
