@@ -79,6 +79,14 @@
     '1枚引く（D）': 'Draw a card (D)', 'シャッフル': 'Shuffle', '上から見る': 'Look at top', 'ライブラリーを探す': 'Search library',
     '上から墓地へ': 'Mill', 'すべてアンタップ': 'Untap all', 'トークンを出す': 'Create token',
     '手札: ダブルクリックで戦場へ': 'Hand: double-click to put onto the battlefield',
+    '手札: ダブルクリックで唱える（自動処理オフなら戦場へ）': 'Hand: double-click to cast (onto the battlefield when auto rules are off)',
+    // CPU対戦・自動処理
+    'CPU対戦': 'vs CPU', 'CPUのデッキ': 'CPU deck', 'CPU のデッキに7枚以上のカードが必要です。': 'The CPU deck needs at least 7 cards.',
+    '自動処理：オン': 'Auto rules: On', '自動処理：オフ': 'Auto rules: Off',
+    'マナの支払いと、読み取れるカードの効果を自動で処理する': 'Automatically pay mana and resolve the card effects that can be read',
+    '唱える（自動でマナを払う）': 'Cast (pay mana automatically)', 'マナを払わずに唱える': 'Cast without paying mana',
+    'あなた（自分）': 'You', '光っているカードをクリック': 'Click a highlighted card', 'よろしくお願いします！': 'Good luck, have fun!',
+    '基本土地が見つからない': 'No basic land found', 'すべて破壊': 'Destroyed all', 'すべて手札に戻した': 'Returned all to hand', '効果': 'Effect',
     '戦場: クリックでタップ（攻撃ステップではクリックで攻撃）': 'Battlefield: click to tap (in the attack step, click to attack)',
     '右クリックで移動メニュー／ドラッグでも移動できます': 'Right-click for the move menu / you can also drag cards',
     'カードをクリック（右クリック）で移動先を選択': 'Click (or right-click) a card to choose where it goes',
@@ -141,6 +149,16 @@
   }));
 
   const T = (s) => EXACT.get(s) ?? s;
+  // 効果の出どころ（「相手のLightning Bolt」「CPUのShock」）
+  const src = (s) => (s.startsWith('相手の') ? `Opponent's ${s.slice(3)}` : s.replace(/^(.+?)の(.+)$/, (_, p, c) => `${T(p)}'s ${c}`));
+  // 効果の説明（rules.js の describe）
+  const fxText = (d) => d
+    .replace(/^(\d+|X)点のダメージ（全体）$/, '$1 damage to each')
+    .replace(/^(\d+|X)点のダメージ$/, '$1 damage')
+    .replace(/^(\d+|X)点のライフを失う$/, 'lose $1 life')
+    .replace(/^\+1\/\+1カウンター(\d+|X)個$/, '$1 +1/+1 counter(s)')
+    .replace(/^破壊$/, 'destroy').replace(/^追放$/, 'exile').replace(/^手札に戻す$/, "return to owner's hand")
+    .replace(/^タップ$/, 'tap').replace(/^アンタップ$/, 'untap').replace(/・/g, ', ');
   const list = (s) => s.split('、').join(', ');
   const cards = (n) => `${n} card${Number(n) === 1 ? '' : 's'}`;
   const PHASE_RE = '(アンタップ|アップキープ|ドロー|メイン1|戦闘開始|攻撃|ブロック|ダメージ|戦闘終了|メイン2|終了|クリーンアップ)';
@@ -149,6 +167,33 @@
 
   // ---------- 訳語（文の形） ----------
   const PATTERNS = [
+    // 自動処理・CPU対戦
+    [/^(.+)を唱えた(?:（X=(\d+)）)?(?:（(.+)をタップ）)?$/, (_, c, x, t) => `Cast ${c}${x ? ` (X=${x})` : ''}${t ? ` (tapped ${list(t)})` : ''}`],
+    [/^(.+)は自分のメイン・フェイズにしか唱えられません（インスタント以外）$/, (_, c) => `${c} can only be cast during your main phase (not an instant)`],
+    [/^マナが足りません（(.+)）。右クリック →「マナを払わずに唱える」で手動にもできます$/, (_, m) => `Not enough mana (${m}). You can also right-click → "Cast without paying mana"`],
+    [/^(.+)の対象がありません$/, (_, c) => `${c} has no legal targets`],
+    [/^「(.+)」の対象を選んでください（(.*)）$/, (_, c, d) => `Choose a target for "${c}" (${fxText(d)})`],
+    [/^X の値（最大 (\d+)）$/, (_, n) => `Value of X (up to ${n})`],
+    [/^(.+)：読み取れない効果は手動で処理してください$/, (_, c) => `${c}: handle the effects that couldn't be read by hand`],
+    [/^(?!戦闘ダメージ)(.+)：相手に(\d+)点$/, (_, c, n) => `${c}: ${n} to the opponent`],
+    [/^(.+)：手札を(\d+)枚捨ててください$/, (_, c, n) => `${src(c)}: discard ${cards(n)}`],
+    [/^(.+)：捨てるカードを手札からあと(\d+)枚クリックしてください$/, (_, c, n) => `${src(c)}: click ${cards(n)} in your hand to discard`],
+    [/^(.+)を捨てた$/, (_, c) => `Discarded ${c}`],
+    [/^(.+)（相手）$/, (_, p) => `${T(p)} (opponent)`],
+    [/^ライブラリーから(.+)を(手札に加えた|戦場に出した)$/, (_, c, t) => `Searched for ${c} and put it ${t === '手札に加えた' ? 'into the hand' : 'onto the battlefield'}`],
+    [/^(.+?)：(\d+)点のダメージを受けた$/, (_, c, n) => `${src(c)}: took ${n} damage`],
+    [/^(.+?)：(\d+)点のライフを失った$/, (_, c, n) => `${src(c)}: lost ${n} life`],
+    [/^(.+?)：(\d+)点のライフを得た$/, (_, c, n) => `${src(c)}: gained ${n} life`],
+    [/^(.+?)：クリーチャーに(\d+)点ずつダメージ$/, (_, c, n) => `${src(c)}: ${n} damage to each creature`],
+    [/^(.+?)：クリーチャーはこのターン([+-]\d+)\/([+-]\d+)$/, (_, c, a, b) => `${src(c)}: creatures get ${a}/${b} this turn`],
+    [/^(.+?)：(.+)に(\d+)点のダメージ$/, (_, c, t, n) => `${src(c)}: ${n} damage to ${t}`],
+    [/^(.+?)：(.+)は破壊されない（破壊不能）$/, (_, c, t) => `${src(c)}: ${t} isn't destroyed (indestructible)`],
+    [/^(.+?)：(.+)を破壊$/, (_, c, t) => `${src(c)}: destroyed ${t}`],
+    [/^(.+?)：(.+)を追放$/, (_, c, t) => `${src(c)}: exiled ${t}`],
+    [/^(.+?)：(.+)を手札に戻した$/, (_, c, t) => `${src(c)}: returned ${t} to its owner's hand`],
+    [/^(.+?)：(.+)はこのターン([+-]\d+)\/([+-]\d+)(?:・(.+))?$/, (_, c, t, a, b, k) => `${src(c)}: ${t} gets ${a}/${b}${k ? ` and ${list(k)}` : ''} this turn`],
+    [/^(.+?)：(.+)に\+1\/\+1カウンター（(-?\d+)）$/, (_, c, t, n) => `${src(c)}: +1/+1 counter on ${t} (${n})`],
+    [/^(.+?)：(すべて破壊|すべて手札に戻した|(.+)をタップ|(.+)をアンタップ)$/, (_, c, r) => `${src(c)}: ${translate(r)}`],
     // デッキ作成
     [/^絵柄を選ぶ - (.+)$/, (_, n) => `Choose art - ${n}`],
     [/^(\d+) 種類（古い順）。クリックで決定$/, (_, n) => `${n} printings (oldest first). Click to choose`],

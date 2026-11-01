@@ -125,6 +125,9 @@ function slimCard(c) {
     power: c.power ?? face.power ?? null,
     toughness: c.toughness ?? face.toughness ?? null,
     keywords: c.keywords ?? [],
+    // 一人回し・対戦の自動処理（マナの支払い・「黒でない」などの対象の条件）に使う
+    manaCost: c.mana_cost ?? face.mana_cost ?? '',
+    colors: c.colors ?? face.colors ?? [],
     copyRule: copyRule(c.type_line ?? '', oracle),
     art: artMode(),
   };
@@ -266,16 +269,17 @@ async function refreshArt(cards) {
   } catch {}
 }
 
-// 以前に保存したデッキのカードに、あとから増やした情報（マナの色・効果テキスト・P/T・キーワード）を補う
-const INFO_FIELDS = ['produced', 'oracleText', 'power', 'toughness', 'keywords'];
+// 以前に保存したデッキのカードに、あとから増やした情報（マナの色・効果テキスト・P/T・キーワード・マナ・コスト・色）を補う
+const INFO_FIELDS = ['produced', 'oracleText', 'power', 'toughness', 'keywords', 'manaCost', 'colors'];
+const lacksInfo = (c) => c.oracleText === undefined || c.manaCost === undefined;
 async function fillCardInfo() {
-  const missing = allDeckCards().filter((c) => c.oracleId && c.oracleText === undefined);
+  const missing = allDeckCards().filter((c) => c.oracleId && lacksInfo(c));
   if (!missing.length) return;
   try {
     await searchByOracleIds(missing, '', (found) => {
       const byId = new Map(found.map((c) => [oracleIdOf(c), slimCard(c)]));
       for (const card of allDeckCards()) {
-        const info = card.oracleText === undefined && byId.get(card.oracleId);
+        const info = lacksInfo(card) && byId.get(card.oracleId);
         if (info) for (const k of INFO_FIELDS) card[k] = info[k];
       }
       saveState();
