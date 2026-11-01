@@ -324,6 +324,9 @@ html.phone .card .pt { font-size: 10px; line-height: 13px; padding: 0 2px; }
 /* ブロック：選んだ自分のクリーチャーと、ブロックできる相手の攻撃クリーチャー */
 .card.block-select { outline: 3px solid #5aa0ff; outline-offset: 2px; }
 .card.block-target { outline: 2px dashed #5aa0ff; outline-offset: 2px; cursor: crosshair; }
+/* 自動処理：呪文・能力の対象として選べるカード */
+.card.targetable { outline: 3px solid #ffb02e; outline-offset: 2px; cursor: crosshair; box-shadow: 0 0 12px #ffb02e; }
+.cpu-deck-field { margin: 4px 0 4px 1.6em; }
 .banner .block-hint { flex-basis: 100%; text-align: center; font-weight: bold; color: #9cc6ff; }
 
 /* お知らせ（召喚酔いなど） */
