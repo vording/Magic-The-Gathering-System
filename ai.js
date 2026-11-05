@@ -153,6 +153,12 @@ const AI = (() => {
       case 'exileGrave': return [...cands].filter((t) => t.grave != null && o(G, t.grave).owner === q).sort((a, b) => (o(G, b.grave).def.cmc || 0) - (o(G, a.grave).def.cmc || 0))[0] ?? null;
       case 'preventBy': return best(theirs.filter((t) => crt(t) && o(G, t.obj).attacking)) ?? null;
       case 'topdeck': return best(theirs.filter((t) => !isT(G, t.obj, 'land'))) ?? null;
+      case 'preventAllTarget': return best(mine.filter(crt)) ?? null;
+      case 'gainPlayer': return cands.find((t) => t.player === p) ?? cands[0];
+      case 'damagePlayerAndCreatures': return face ?? null;
+      case 'untapLandsPlayer': return cands.find((t) => t.player === p) ?? null;
+      case 'peek':
+      case 'peekTop': return face ?? cands[0];
       case 'threaten': return best(theirs.filter((t) => crt(t) && E().ch(G, t.obj).p > 0)) ?? null;
       case 'giveControl': return face ?? null;
       case 'extraTurn': return cands.find((t) => t.player === p) ?? null;
@@ -275,8 +281,16 @@ const AI = (() => {
       for (const fx of spellFx) {
         const spec = E().specOf(fx);
         if (spec) {
-          const t = chooseTarget(G, p, fx, spec, X, mode, null, def.colors);
+          let t = chooseTarget(G, p, fx, spec, X, mode, null, def.colors);
           if (!t) return null;
+          // 「別の対象」：もう選んだものは避ける（相手側を優先）
+          const same = (a, b) => a && b && a.player === b.player && a.obj === b.obj;
+          if (spec.distinct && targets.some((u) => same(u, t))) {
+            const alt = E().targetsFor(G, p, spec, null, def.colors).filter((c) => !targets.some((u) => same(u, c)))
+              .sort((a, b) => Number(a.player === p || (a.obj != null && o(G, a.obj).controller === p)) - Number(b.player === p || (b.obj != null && o(G, b.obj).controller === p)))[0];
+            if (!alt || alt.player === p || (alt.obj != null && o(G, alt.obj).controller === p)) return null;
+            t = alt;
+          }
           targets.push(t);
         } else {
           if (!worth(G, p, fx, X)) return null;
@@ -348,7 +362,14 @@ const AI = (() => {
 
   // ---------- 戦闘 ----------
 
+  // 単独では攻撃できないものが1体だけになったら攻撃しない
   function chooseAttackers(G, p) {
+    const list = chooseAttackers0(G, p);
+    if (list.length === 1 && (E().ch(G, list[0]).notAlone || E().ch(G, list[0]).notAloneAttack)) return [];
+    return list;
+  }
+
+  function chooseAttackers0(G, p) {
     const q = other(p);
     const mine = creatures(G, p).filter((id) => E().canAttack(G, id) && E().ch(G, id).p > 0);
     const blockers = creatures(G, q).filter((id) => !o(G, id).tapped);
@@ -569,6 +590,7 @@ const AI = (() => {
       }
       case 'discard': return { type: 'choose', ids: chooseDiscard(G, p, pend.n, pend.options) };
       case 'search': return { type: 'choose', ids: [chooseSearch(G, p, pend.options)] };
+      case 'copy': return { type: 'choose', ids: [[...pend.options].sort((a, b) => value(G, b) - value(G, a))[0]] };
       case 'putFromHand': return { type: 'choose', ids: [[...pend.options].sort((a, b) => (o(G, b).def.cmc || 0) - (o(G, a).def.cmc || 0))[0]] };
       case 'sacUnlessOther': {
         const keep = value(G, pend.id) >= 4;
