@@ -1,6 +1,6 @@
 # 旧枠モダンの自動処理の対応状況
 
-全1016種類：すべて自動 851（83.8%）・一部だけ 49・できない 116（2026-11-05 時点。`node tools/coverage.js --write` で更新）
+全1016種類：すべて自動 852（83.9%）・一部だけ 49・できない 115（2026-11-05 時点。`node tools/coverage.js --write` で更新）
 
 ## 読み取れない文があるカード
 
@@ -57,7 +57,6 @@
 | Evil Eye of Orms-by-Gore | Non-Eye creatures you control can't attack. |
 | Exhaustion | Creatures and lands target opponent controls don't untap during their next untap step. |
 | Faceless Butcher | When this enters, exile another target creature.<br>When this leaves the battlefield, return the exiled card to the battlefield under its owner's control. |
-| Fact or Fiction | Reveal the top five cards of your library. An opponent separates those cards into two piles. Put one pile into your hand and the other into your graveyard. |
 | Feldon's Cane | {T}, Exile this: Shuffle your graveyard into your library. |
 | Final Punishment | Target player loses life equal to the damage already dealt to that player this turn. |
 | Fire // Ice | Fire deals 2 damage divided as you choose among one or two targets. |

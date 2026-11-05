@@ -590,6 +590,27 @@ const AI = (() => {
       }
       case 'discard': return { type: 'choose', ids: chooseDiscard(G, p, pend.n, pend.options) };
       case 'search': return { type: 'choose', ids: [chooseSearch(G, p, pend.options)] };
+      case 'separate': {
+        // 分ける側：相手が良い方を取るので、2つの束の価値の差が小さくなるように分ける
+        const v = (id) => (isT(G, id, 'land') ? 1.5 : (o(G, id).def.cmc || 0) + 2);
+        const opts = pend.options;
+        let best = [];
+        let bestScore = Infinity;
+        for (let mask = 0; mask < 1 << opts.length; mask++) {
+          const a = opts.filter((_, i) => mask & (1 << i));
+          const sa = a.reduce((s, id) => s + v(id), 0);
+          const sb = opts.reduce((s, id) => s + v(id), 0) - sa;
+          const score = Math.max(sa, sb);
+          if (score < bestScore) { bestScore = score; best = a; }
+        }
+        return { type: 'choose', ids: best };
+      }
+      case 'choosePile': {
+        // 選ぶ側：価値の高い束
+        const v = (id) => (isT(G, id, 'land') ? 1.5 : (o(G, id).def.cmc || 0) + 2);
+        const sum = (pile) => pile.reduce((s, id) => s + v(id), 0);
+        return { type: 'pile', pile: sum(pend.piles[0]) >= sum(pend.piles[1]) ? 0 : 1 };
+      }
       case 'copy': return { type: 'choose', ids: [[...pend.options].sort((a, b) => value(G, b) - value(G, a))[0]] };
       case 'putFromHand': return { type: 'choose', ids: [[...pend.options].sort((a, b) => (o(G, b).def.cmc || 0) - (o(G, a).def.cmc || 0))[0]] };
       case 'sacUnlessOther': {

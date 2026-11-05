@@ -545,6 +545,26 @@ if (pool) {
     for (let i = 0; i < 8 && W.step !== 'main2'; i++) passBoth(W);
     assert.equal(W.objects[id(W, 'Cinder Wall')].zone, 'graveyard');
   };
+  tests['real cards: Fact or Fiction'] = () => {
+    const G = setup({ p0: { hand: [P('Fact or Fiction')], bf: [L.Island, L.Island, L.Island, L.Island] } });
+    const top = G.players[0].library.slice(0, 5);
+    const hand = G.players[0].hand.length;
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Fact or Fiction') }));
+    passBoth(G);
+    assert.equal(Engine.needs(G).type, 'separate');
+    assert.equal(Engine.needs(G).player, 1); // 対戦相手が分ける
+    // 分けている間、唱えた側からも公開したカードが見える
+    assert.ok(top.every((x) => !Engine.view(G, 0).objects[x].hidden));
+    ok(Engine.perform(G, 1, { type: 'choose', ids: top.slice(0, 2) }));
+    assert.equal(Engine.needs(G).type, 'choosePile');
+    assert.equal(Engine.needs(G).player, 0);
+    ok(Engine.perform(G, 0, { type: 'pile', pile: 1 }));
+    assert.equal(G.players[0].hand.length, hand - 1 + 3);
+    assert.ok(top.slice(0, 2).every((x) => G.objects[x].zone === 'graveyard'));
+    assert.ok(top.slice(2).every((x) => G.objects[x].zone === 'hand'));
+    assert.equal(Engine.unsupported(CardText.compile(P('Fact or Fiction'))).length, 0);
+    assert.equal(CardText.compile(P('Fact or Fiction')).support, 'full');
+  };
   tests['oldframe-modern: random decks play to the end'] = () => {
     const games = Number(process.env.GAMES ?? 40);
     const basics = pool.filter((c) => /Basic Land/.test(c.typeLine) && !/Snow/.test(c.typeLine));

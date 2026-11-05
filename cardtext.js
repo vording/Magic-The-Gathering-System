@@ -580,6 +580,9 @@ const CardText = (() => {
   }
 
   function effects(text, card) {
+    // 「上からN枚を公開し、対戦相手が2つの束に分け、1つを手札に、もう1つを墓地に」（Fact or Fiction）
+    const fof = /^reveal the top (\w+) cards of your library\. an opponent separates those cards into two piles\. put one pile into your hand and the other into your graveyard\.?$/i.exec(text.trim());
+    if (fof) return [{ type: 'piles', n: num(fof[1].toLowerCase()), rest: 'graveyard' }];
     const out = [];
     const ss = sentences(text);
     for (let i = 0; i < ss.length; i++) {
