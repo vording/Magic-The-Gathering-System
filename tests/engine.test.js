@@ -518,6 +518,33 @@ if (pool) {
     const clone = C.battlefield.find((x) => C.objects[x].controller === 0 && C.objects[x].def.name === 'Serra Angel');
     assert.ok(clone != null && Engine.ch(C, clone).kw.has('flying'));
   };
+  tests['real cards: syncopate, flame wave, cone of flame, cinder wall, upwelling'] = () => {
+    const G = setup({ p0: { hand: [K.bears], bf: [L.Forest, L.Forest] }, p1: { hand: [P('Syncopate')], bf: [L.Island, L.Island, L.Island] } });
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Grizzly Bears') }));
+    ok(Engine.perform(G, 0, { type: 'pass' }));
+    ok(Engine.perform(G, 1, { type: 'cast', id: id(G, 'Syncopate'), x: 2, targets: [{ stack: G.stack[0].sid }] }));
+    passBoth(G);
+    assert.equal(G.pending.cost, '{2}');
+    ok(Engine.perform(G, 0, { type: 'pay', yes: false }));
+    assert.equal(G.objects[id(G, 'Grizzly Bears')].zone, 'exile');
+    const F = setup({ p0: { hand: [P('Flame Wave')], bf: Array(7).fill(L.Mountain) }, p1: { bf: [K.bears, K.giant] } });
+    ok(Engine.perform(F, 0, { type: 'cast', id: id(F, 'Flame Wave'), targets: [{ player: 1 }] }));
+    passBoth(F);
+    assert.equal(F.players[1].life, 16);
+    assert.equal(F.objects[id(F, 'Hill Giant')].zone, 'graveyard');
+    const C = setup({ p0: { hand: [P('Cone of Flame')], bf: Array(5).fill(L.Mountain) }, p1: { bf: [K.bears] } });
+    assert.ok(!Engine.perform(C, 0, { type: 'cast', id: id(C, 'Cone of Flame'), targets: [{ player: 1 }, { player: 1 }, { obj: id(C, 'Grizzly Bears') }] }).ok);
+    ok(Engine.perform(C, 0, { type: 'cast', id: id(C, 'Cone of Flame'), targets: [{ player: 0 }, { obj: id(C, 'Grizzly Bears') }, { player: 1 }] }));
+    passBoth(C);
+    assert.equal(C.players[1].life, 17);
+    const W = setup({ p0: { bf: [K.giant] }, p1: { bf: [P('Cinder Wall')] }, step: 'begincombat' });
+    passBoth(W);
+    ok(Engine.perform(W, 0, { type: 'attackers', ids: [id(W, 'Hill Giant')] }));
+    passBoth(W);
+    ok(Engine.perform(W, 1, { type: 'blockers', blocks: { [id(W, 'Cinder Wall')]: id(W, 'Hill Giant') } }));
+    for (let i = 0; i < 8 && W.step !== 'main2'; i++) passBoth(W);
+    assert.equal(W.objects[id(W, 'Cinder Wall')].zone, 'graveyard');
+  };
   tests['oldframe-modern: random decks play to the end'] = () => {
     const games = Number(process.env.GAMES ?? 40);
     const basics = pool.filter((c) => /Basic Land/.test(c.typeLine) && !/Snow/.test(c.typeLine));

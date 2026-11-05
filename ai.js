@@ -153,6 +153,12 @@ const AI = (() => {
       case 'exileGrave': return [...cands].filter((t) => t.grave != null && o(G, t.grave).owner === q).sort((a, b) => (o(G, b.grave).def.cmc || 0) - (o(G, a.grave).def.cmc || 0))[0] ?? null;
       case 'preventBy': return best(theirs.filter((t) => crt(t) && o(G, t.obj).attacking)) ?? null;
       case 'topdeck': return best(theirs.filter((t) => !isT(G, t.obj, 'land'))) ?? null;
+      case 'preventAllTarget': return best(mine.filter(crt)) ?? null;
+      case 'gainPlayer': return cands.find((t) => t.player === p) ?? cands[0];
+      case 'damagePlayerAndCreatures': return face ?? null;
+      case 'untapLandsPlayer': return cands.find((t) => t.player === p) ?? null;
+      case 'peek':
+      case 'peekTop': return face ?? cands[0];
       case 'threaten': return best(theirs.filter((t) => crt(t) && E().ch(G, t.obj).p > 0)) ?? null;
       case 'giveControl': return face ?? null;
       case 'extraTurn': return cands.find((t) => t.player === p) ?? null;
@@ -275,8 +281,16 @@ const AI = (() => {
       for (const fx of spellFx) {
         const spec = E().specOf(fx);
         if (spec) {
-          const t = chooseTarget(G, p, fx, spec, X, mode, null, def.colors);
+          let t = chooseTarget(G, p, fx, spec, X, mode, null, def.colors);
           if (!t) return null;
+          // 「別の対象」：もう選んだものは避ける（相手側を優先）
+          const same = (a, b) => a && b && a.player === b.player && a.obj === b.obj;
+          if (spec.distinct && targets.some((u) => same(u, t))) {
+            const alt = E().targetsFor(G, p, spec, null, def.colors).filter((c) => !targets.some((u) => same(u, c)))
+              .sort((a, b) => Number(a.player === p || (a.obj != null && o(G, a.obj).controller === p)) - Number(b.player === p || (b.obj != null && o(G, b.obj).controller === p)))[0];
+            if (!alt || alt.player === p || (alt.obj != null && o(G, alt.obj).controller === p)) return null;
+            t = alt;
+          }
           targets.push(t);
         } else {
           if (!worth(G, p, fx, X)) return null;

@@ -95,7 +95,7 @@ const Engine = (() => {
   // サブタイプ（「Goblins」「Elves」のような複数形も）
   const singular = (w) => w.toLowerCase().replace(/ves$/, 'f').replace(/(?<!s)s$/, '');
   const LAND_TYPES = ['plains', 'island', 'swamp', 'mountain', 'forest'];
-  const hasSub = (o, w) => [...(o.landOverride ? o.def.subtypes.filter((t) => !LAND_TYPES.includes(t.toLowerCase())).concat([o.landOverride]) : o.def.subtypes), ...(o.animated?.subtypes ?? [])].some((s) => s.toLowerCase() === w.toLowerCase() || s.toLowerCase() === singular(w));
+  const hasSub = (o, w) => (o.def.statics.some((st) => st.allTypes) && o.def.types.includes('creature') && !LAND_TYPES.includes(w.toLowerCase())) || [...(o.landOverride ? o.def.subtypes.filter((t) => !LAND_TYPES.includes(t.toLowerCase())).concat([o.landOverride]) : o.def.subtypes), ...(o.animated?.subtypes ?? [])].some((s) => s.toLowerCase() === w.toLowerCase() || s.toLowerCase() === singular(w));
   const isCreatureObj = (G, id) => isType(obj(G, id), 'creature');
   const log = (G, p, text) => {
     G.log.push({ turn: G.turn, p, text });
@@ -111,6 +111,7 @@ const Engine = (() => {
     // 土地のタイプが変わっている（Blood Moon・Evil Presence）：その基本土地のマナ能力だけになる
     const BASIC = { plains: 'W', island: 'U', swamp: 'B', mountain: 'R', forest: 'G' };
     const out = o.landOverride ? [{ cost: { mana: '', tap: true }, effects: [{ type: 'addMana', mana: { choices: [BASIC[o.landOverride]], amount: 1 } }], mana: { choices: [BASIC[o.landOverride]], amount: 1 }, text: '{T}: Add mana.' }] : [...o.def.activated];
+    if (o.animated?.grants) out.push(...o.animated.grants);
     if (o.zone === 'battlefield') {
       for (const sid of G.battlefield) {
         const src = obj(G, sid);
@@ -145,7 +146,7 @@ const Engine = (() => {
       if (s.setP) { const n = countOf(G, o.controller, s.setP, id); c.p = n; if (s.plusT != null) c.t = n + s.plusT; }
     }
     if (o.zone !== 'battlefield') return c;
-    const FLAGS = ['preventFromCreatures', 'notBlockedByPowerGE', 'unblockableAlone', 'cantAttack', 'cantBlock', 'unblockable', 'noUntap', 'mustAttack', 'preventAll', 'preventCombatAll', 'assignUnblocked', 'notAlone', 'notAloneAttack', 'notAloneBlock', 'blockOnly', 'notBlockedBy', 'maxBlockers', 'minBlockers',
+    const FLAGS = ['blockOnlyWallOrFlying', 'allTypes', 'preventFromCreatures', 'notBlockedByPowerGE', 'unblockableAlone', 'cantAttack', 'cantBlock', 'unblockable', 'noUntap', 'mustAttack', 'preventAll', 'preventCombatAll', 'assignUnblocked', 'notAlone', 'notAloneAttack', 'notAloneBlock', 'blockOnly', 'notBlockedBy', 'maxBlockers', 'minBlockers',
       'blockOnlyFlying', 'cantBlockPower', 'attackNeeds', 'blockOnlyKw'];
     const add = (s, owner = o.controller) => {
       c.p += s.p || 0;
@@ -180,6 +181,12 @@ const Engine = (() => {
     }
     for (const e of G.effects) {
       if (e.id === id) add(e);
+    }
+    // 「他のエンチャントは被覆を持つ」など、クリーチャー以外へのロード
+    for (const sid of G.battlefield) {
+      const lt = obj(G, sid).def.lordType;
+      if (!lt || (lt.other && sid === id) || obj(G, sid).controller !== o.controller || !isType(o, lt.type)) continue;
+      for (const k of lt.kw) c.kw.add(k);
     }
     // 墓地にあるときに働く（Valor・Wonder）
     if (isType(o, 'creature')) {
@@ -548,7 +555,10 @@ const Engine = (() => {
     return plan;
   }
 
-  const emptyPools = (G) => { for (const pl of G.players) for (const k of Object.keys(pl.pool)) pl.pool[k] = 0; };
+  const emptyPools = (G) => {
+    if (G.battlefield.some((id) => (obj(G, id).def.globalStatics ?? []).some((st) => st.keepMana))) return; // Upwelling
+    for (const pl of G.players) for (const k of Object.keys(pl.pool)) pl.pool[k] = 0;
+  };
 
   // ---------- 対象 ----------
 
@@ -855,7 +865,9 @@ const Engine = (() => {
         G.players[p].landsPlayed = 0;
         log(G, p, `ターン${G.turn}開始`);
         let any = false;
-        for (const id of bf(G, p)) {
+        // Seedborn Muse：相手のアンタップ・ステップでも自分のパーマネントをアンタップする
+        const untappers = [p, ...(playerStatic(G, other(p), 'seedborn') ? [other(p)] : [])];
+        for (const id of G.battlefield.filter((x) => untappers.includes(obj(G, x).controller))) {
           const o = obj(G, id);
           if (o.tapped && !ch(G, id).noUntap && !globalNoUntap(G, id)) { o.tapped = false; any = true; }
         }
@@ -1067,7 +1079,8 @@ const Engine = (() => {
     const o = obj(G, id);
     if (!onBf(G, id) || !isType(o, 'creature') || o.tapped || o.controller !== G.active) return false;
     const c = ch(G, id);
-    if (c.kw.has('defender') || c.cantAttack || isSick(G, id)) return false;
+    if ((c.kw.has('defender') && !(hasSub(o, 'wall') && globalOn(G, (st) => st.wallsAttack))) || c.cantAttack || isSick(G, id)) return false;
+    for (const q of [0, 1]) if (playerStatic(G, q, 'bridge') && c.p > G.players[q].hand.length) return false;
     if (c.attackNeeds && !bf(G, other(o.controller)).some((x) => hasSub(obj(G, x), c.attackNeeds))) return false;
     // 「飛行を持たないクリーチャーはあなたを攻撃できない」（選んだ色だけ、など）
     for (const mid of bf(G, other(o.controller))) {
@@ -1096,6 +1109,7 @@ const Engine = (() => {
     if (ac.kw.has('intimidate') && !isType(b, 'artifact') && !bc.colors.some((x) => ac.colors.includes(x))) return false;
     if (protectedFrom(G, attacker, bc.colors)) return false;
     if (ac.blockOnly && !hasSub(b, ac.blockOnly)) return false;
+    if (ac.blockOnlyWallOrFlying && !hasSub(b, 'wall') && !bc.kw.has('flying')) return false;
     if (ac.notBlockedBy && hasSub(b, ac.notBlockedBy)) return false;
     if (ac.blockOnlyKw && !bc.kw.has(ac.blockOnlyKw)) return false;
     if (bc.blockOnlyFlying && !ac.kw.has('flying')) return false;
@@ -1270,6 +1284,7 @@ const Engine = (() => {
         for (const aid of G.battlefield) if (obj(G, aid).attachedTo === e.to.obj) queueTrigger(G, aid, 'enchantedDealtDamage');
       }
       if (sc.kw.has('lifelink')) G.players[src.controller].life += e.n;
+      queueAll(G, 'creatureDealsCombatDamage', { subject: e.src, amount: e.n });
       for (const aid of G.battlefield) if (obj(G, aid).attachedTo === e.src) queueTrigger(G, aid, 'enchantedDealsDamage', { player: e.to.player ?? null, amount: e.n });
     }
     for (const q of [0, 1]) if (total[q]) { log(G, q, `戦闘で${total[q]}点のダメージを受けた（ライフ ${G.players[q].life}）`); sfx(G, 'lifeloss'); }
@@ -1366,7 +1381,12 @@ const Engine = (() => {
   }
 
   function checkTargets(G, p, specs, targets, srcId, srcColors, total = null) {
+    const seen = [];
     specs.forEach((s, i) => {
+      if (s?.distinct && targets?.[i]) {
+        if (seen.some((t) => sameTarget(t, targets[i]))) fail('別々の対象を選んでください');
+        seen.push(targets[i]);
+      }
       if (!s) return;
       const t = targets?.[i];
       if (!t) fail('対象を選んでください');
@@ -1465,6 +1485,8 @@ const Engine = (() => {
     if (c.removeNamed && (o.counters[c.removeNamed] ?? 0) < (c.removeNamedN ?? 1)) return { ok: false, reason: 'カウンターがありません' };
     if (c.tapOther && !tapOptions(G, p, c.tapOther, id).length) return { ok: false, reason: 'タップできるものがありません' };
     if (c.returnType && !sacOptions(G, p, c.returnType).length) return { ok: false, reason: '手札に戻すものがありません' };
+    if (c.exileGrave && G.players[p].graveyard.length < c.exileGrave) return { ok: false, reason: '墓地のカードが足りません' };
+    if (c.mill && !G.players[p].library.length) return { ok: false, reason: 'ライブラリーがありません' };
     if (a.upkeep && !(G.step === 'upkeep' && G.active === p)) return { ok: false, reason: '自分のアップキープにだけ起動できます' };
     if (a.combat && !['begincombat', 'attackers', 'blockers', 'firststrike', 'damage', 'endcombat'].includes(G.step)) return { ok: false, reason: '戦闘中にだけ起動できます' };
     if (a.endcombat && G.step !== 'endcombat') return { ok: false, reason: '戦闘終了ステップにだけ起動できます' };
@@ -1512,6 +1534,10 @@ const Engine = (() => {
     if (c.life) setLife(G, p, G.players[p].life - c.life);
     if (c.removeCounter) o.counters.p1 -= c.removeCounter;
     if (c.removeNamed) o.counters[c.removeNamed] -= c.removeNamedN ?? 1;
+    if (c.exileGrave) for (const g of G.players[p].graveyard.slice(0, c.exileGrave)) move(G, g, 'exile', { silent: true });
+    if (c.mill) move(G, G.players[p].library[0], 'graveyard');
+    if (c.halfLife) setLife(G, p, G.players[p].life - Math.ceil(G.players[p].life / 2));
+    if (c.discardHand) for (const h of [...G.players[p].hand]) discardCard(G, h);
     if (c.returnType) {
       const opts = sacOptions(G, p, c.returnType);
       const r = opts.includes(Number(sacrifice)) ? Number(sacrifice) : opts[0];
@@ -1540,6 +1566,7 @@ const Engine = (() => {
     }
     const lki = { name: o.card.name, colors: o.def.colors };
     if (c.sacSelf) move(G, id, 'graveyard');
+    if (c.exileSelf) move(G, id, 'exile');
     if (c.discardSelf) move(G, id, 'graveyard', { silent: true });
     o.used[index] = G.turn;
     o.usedCount = o.usedCount ?? {};
@@ -1791,9 +1818,11 @@ const Engine = (() => {
       case 'counter': {
         const s = G.stack.find((x) => x.sid === t?.stack);
         if (!s) break;
+        const exile = item.effects.some((f) => f.type === 'counterExile');
         if (fx.unless) {
-          G.choices.push({ type: 'payOrNot', player: s.controller, cost: `{${fx.unless}}`, reason: `${by}（支払わなければ${s.name}は打ち消される）`, onDecline: { kind: 'counter', sid: s.sid, by } });
-        } else counterSpell(G, s, by);
+          const n = fx.unless === 'X' ? x : fx.unless;
+          G.choices.push({ type: 'payOrNot', player: s.controller, cost: `{${n}}`, reason: `${by}（支払わなければ${s.name}は打ち消される）`, onDecline: { kind: 'counter', sid: s.sid, by, exile } });
+        } else counterSpell(G, s, by, exile);
         break;
       }
       case 'regen': {
@@ -1830,6 +1859,27 @@ const Engine = (() => {
       case 'reorder': {
         const top = G.players[p].library.slice(0, val(fx.n));
         if (top.length > 1) G.choices.push({ type: 'reorder', player: p, options: top, reason: by });
+        break;
+      }
+      case 'destroySelf': if (onBf(G, src)) destroy(G, src); break;
+      case 'untapAll': for (const id of G.battlefield) if (matchFilter(G, id, fx.filter)) obj(G, id).tapped = false; break;
+      case 'gainPlayer': if (t?.player != null) setLife(G, t.player, G.players[t.player].life + val(fx.n)); break;
+      case 'damagePlayerAndCreatures':
+        if (t?.player != null) {
+          damageTo(t, val(fx.n));
+          for (const id of bf(G, t.player)) if (isCreatureObj(G, id)) damageTo({ obj: id }, val(fx.n));
+        }
+        break;
+      case 'counterExile': break;
+      case 'preventAllTarget': if (t?.obj != null) G.effects.push({ id: t.obj, preventAll: true, until: 'eot' }); break;
+      case 'exileSelfSpell': item.flashback = true; break; // 解決したら追放する
+      case 'untapLandsPlayer': if (t?.player != null) for (const id of bf(G, t.player)) if (isType(obj(G, id), 'land') && (!fx.basic || obj(G, id).def.supertypes.includes('basic'))) obj(G, id).tapped = false; break;
+      case 'peek': if (t?.player != null) log(G, p, `${by}：${G.players[t.player].name}の手札：${G.players[t.player].hand.map((h) => nameOf(G, h)).join('、') || 'なし'}`); break;
+      case 'peekTop': if (t?.player != null) log(G, p, `${by}：${G.players[t.player].name}のライブラリーの上から${val(fx.n)}枚：${G.players[t.player].library.slice(0, val(fx.n)).map((h) => nameOf(G, h)).join('、')}`); break;
+      case 'fogSelf': if (onBf(G, src)) G.effects.push({ id: src, preventCombatAll: true, until: 'eot' }); break;
+      case 'animateLands': {
+        const lands = G.battlefield.filter((id) => isType(obj(G, id), 'land') && (fx.who !== 'target' || obj(G, id).controller === t?.player));
+        for (const id of lands) obj(G, id).animated = { p: fx.p, t: fx.t, kw: [], colors: [], subtypes: [], until: 'eot' };
         break;
       }
       case 'destroyAttachedOrSelf': {
@@ -1899,7 +1949,7 @@ const Engine = (() => {
         const id = src;
         if (!onBf(G, id)) break;
         const o = obj(G, id);
-        o.animated = { p: fx.p === 'X' ? x : fx.p, t: fx.t === 'X' ? x : fx.t, kw: fx.kw, colors: fx.colors, artifact: fx.artifact, subtypes: fx.subtypes, until: fx.until };
+        o.animated = { grants: fx.grants ?? null, p: fx.p === 'X' ? x : fx.p, t: fx.t === 'X' ? x : fx.t, kw: fx.kw, colors: fx.colors, artifact: fx.artifact, subtypes: fx.subtypes, until: fx.until };
         log(G, p, `${o.card.name}は${o.animated.p}/${o.animated.t}のクリーチャーになった`);
         break;
       }
@@ -1929,7 +1979,7 @@ const Engine = (() => {
       case 'topdeck': if (t?.obj != null) { log(G, p, `${by}：${nameOf(G, t.obj)}をライブラリーの一番上へ`); move(G, t.obj, 'library', { silent: true }); } break;
       case 'returnOwn': G.choices.push({ type: 'returnOwn', player: p, what: fx.what, reason: by }); break;
       case 'unblockable': if (t?.obj != null) G.effects.push({ id: t.obj, unblockable: true, until: 'eot' }); break;
-      case 'cop': G.players[p].cop = [...(G.players[p].cop ?? []), fx.what]; log(G, p, `${by}：次に${fx.what}の発生源から受けるダメージを軽減する`); break;
+      case 'cop': G.players[p].cop = [...(G.players[p].cop ?? []), fx.what === 'chosen' ? obj(G, src)?.chosen ?? 'red' : fx.what]; log(G, p, `${by}：次に${fx.what}の発生源から受けるダメージを軽減する`); break;
       case 'payOr':
         G.choices.push({ type: 'payOrNot', player: p, cost: fx.cost, reason: by, onDecline: { kind: 'effects', effects: fx.effects, source: src, name: by, colors: srcColors } });
         break;
@@ -2025,15 +2075,15 @@ const Engine = (() => {
     log(G, obj(G, id).controller, `${by}：${nameOf(G, id)}はこのターン${fmt(p)}/${fmt(t)}${kw?.length ? `・${kw.join('、')}` : ''}`);
   }
 
-  function counterSpell(G, s, by) {
+  function counterSpell(G, s, by, exile = false) {
     const i = G.stack.indexOf(s);
     if (i < 0) return;
-    if (s.objId != null && obj(G, s.objId)?.def.uncounterable) { log(G, s.controller, `${s.name}は打ち消されない`); return; }
+    if (s.objId != null && (obj(G, s.objId)?.def.uncounterable || (isType(obj(G, s.objId), 'creature') && globalOn(G, (st) => st.creaturesUncounterable)))) { log(G, s.controller, `${s.name}は打ち消されない`); return; }
     G.stack.splice(i, 1);
     log(G, s.controller, `${s.name}は${by}で打ち消された`);
     sfx(G, 'cancel');
     const o = s.objId != null ? obj(G, s.objId) : null;
-    if (o) finishSpell(G, s, o, { countered: true });
+    if (o) finishSpell(G, exile ? { ...s, flashback: true } : s, o, { countered: true });
   }
 
   // ---------- 行動 ----------
@@ -2322,7 +2372,7 @@ const Engine = (() => {
         }
         if (pend.onDecline.kind === 'counter') {
           const s = G.stack.find((x) => x.sid === pend.onDecline.sid);
-          if (s) counterSpell(G, s, pend.onDecline.by);
+          if (s) counterSpell(G, s, pend.onDecline.by, pend.onDecline.exile);
         } else if (pend.onDecline.kind === 'sacrifice' && onBf(G, pend.onDecline.id)) {
           log(G, p, `${pend.reason}：支払わなかったので生け贄に捧げた`);
           move(G, pend.onDecline.id, 'graveyard', { silent: true });
@@ -2392,8 +2442,9 @@ const Engine = (() => {
       'exileGraveAll', 'scry', 'lookPick', 'reorder', 'payThen', 'tapAll', 'unblockable', 'cop', 'payOr', 'topdeck', 'returnOwn',
       'animate', 'threaten', 'giveControl', 'extraTurn', 'playerShroud', 'drawPlayer', 'delayed', 'sacUnlessOther', 'exileSameName', 'shuffleGraveIn',
       'millHalf', 'bounceAllOwned', 'putFromHand', 'drawBoundController', 'countersAttached', 'returnOwnPlayer', 'removeFromCombat', 'revealTake',
-      'destroyAttachedOrSelf'],
-    triggers: ['becomesTapped', 'enchantedTapped', 'enchantedDealtDamage', 'enchantedUpkeep', 'landTappedForMana', 'dealtCombatDamage', 'creatureDamagesPlayer', 'enchantedDealsDamage', 'attacksAlone', 'blocksOrBlockedBy', 'blockedBy', 'eachDrawstep', 'drawCard', 'discard', 'damagedDies', 'etb', 'dies', 'etbOrDies', 'blocksOrBlocked', 'leaves', 'upkeep', 'eachUpkeep', 'endstep', 'eachEndstep', 'drawstep', 'attacks', 'blocks', 'attacksOrBlocks', 'becomesBlocked',
+      'destroyAttachedOrSelf', 'destroySelf', 'untapAll', 'gainPlayer', 'damagePlayerAndCreatures', 'counterExile', 'preventAllTarget', 'exileSelfSpell',
+      'untapLandsPlayer', 'peek', 'peekTop', 'fogSelf', 'animateLands'],
+    triggers: ['creatureDealsCombatDamage', 'becomesTapped', 'enchantedTapped', 'enchantedDealtDamage', 'enchantedUpkeep', 'landTappedForMana', 'dealtCombatDamage', 'creatureDamagesPlayer', 'enchantedDealsDamage', 'attacksAlone', 'blocksOrBlockedBy', 'blockedBy', 'eachDrawstep', 'drawCard', 'discard', 'damagedDies', 'etb', 'dies', 'etbOrDies', 'blocksOrBlocked', 'leaves', 'upkeep', 'eachUpkeep', 'endstep', 'eachEndstep', 'drawstep', 'attacks', 'blocks', 'attacksOrBlocks', 'becomesBlocked',
       'combatDamagePlayer', 'dealsDamagePlayer', 'dealtDamage', 'creatureEnters', 'creatureDies', 'cast', 'cycled'],
     statics: ['self', 'attached', 'lord', 'costMod', 'moat'],
   };
