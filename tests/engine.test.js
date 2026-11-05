@@ -466,6 +466,32 @@ if (pool) {
     passBoth(X);
     assert.equal(Object.values(X.objects).filter((o) => o.def.name === 'Grizzly Bears' && o.zone === 'exile').length, 3);
   };
+  tests['real cards: multiple targets, reveal, global statics'] = () => {
+    const G = setup({ p0: { hand: [P('Panic Attack')], bf: [L.Mountain, L.Mountain, L.Mountain] }, p1: { bf: [K.bears, K.giant] } });
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Panic Attack'), targets: [{ multi: [{ obj: id(G, 'Grizzly Bears') }, { obj: id(G, 'Hill Giant') }] }] }));
+    passBoth(G);
+    assert.ok(Engine.ch(G, id(G, 'Grizzly Bears')).cantBlock && Engine.ch(G, id(G, 'Hill Giant')).cantBlock);
+    const S = setup({ p0: { hand: [P('Sea Drake')], bf: [L.Island, L.Island, L.Island] } });
+    ok(Engine.perform(S, 0, { type: 'cast', id: id(S, 'Sea Drake') }));
+    passBoth(S);
+    assert.equal(Engine.needs(S).type, 'triggerTarget');
+    const lands = S.battlefield.filter((x) => S.objects[x].def.name === 'Island').slice(0, 2);
+    ok(Engine.perform(S, 0, { type: 'target', target: { multi: lands.map((x) => ({ obj: x })) } }));
+    passBoth(S);
+    assert.equal(S.players[0].hand.filter((x) => S.objects[x].def.name === 'Island').length, 2);
+    const M = setup({ p0: { hand: [P('Mulch')], bf: [L.Forest, L.Forest], library: [L.Forest, K.bears, L.Mountain, K.bolt] } });
+    const top = M.players[0].library.slice(0, 4);
+    const landsTop = top.filter((x) => Engine.isType(M, x, 'land')).length;
+    ok(Engine.perform(M, 0, { type: 'cast', id: id(M, 'Mulch') }));
+    passBoth(M);
+    assert.equal(M.players[0].hand.length, landsTop);
+    assert.equal(M.players[0].graveyard.length, 1 + 4 - landsTop); // Mulch + 土地以外
+    const R = setup({ p0: { hand: [L.Island], bf: [P('Root Maze')] } });
+    ok(Engine.perform(R, 0, { type: 'playLand', id: id(R, 'Island', 'hand') }));
+    assert.ok(R.objects[id(R, 'Island', 'battlefield')].tapped);
+    const C = setup({ p0: { bf: [P('Steel Golem')], hand: [K.bears] } });
+    assert.equal(Engine.castInfo(C, 0, id(C, 'Grizzly Bears')).ok, false);
+  };
   tests['oldframe-modern: random decks play to the end'] = () => {
     const games = Number(process.env.GAMES ?? 40);
     const basics = pool.filter((c) => /Basic Land/.test(c.typeLine) && !/Snow/.test(c.typeLine));
@@ -496,6 +522,7 @@ if (pool) {
         }
       }
       if (G.winner != null || G.turn >= 60) finished++;
+      else console.log(`  game ${g} stuck at turn ${G.turn} step ${G.step}:`, G.log.slice(-8).map((e) => e.text).join(' | '));
     }
     console.log(`  ${finished}/${games} games finished`);
     assert.equal(finished, games);

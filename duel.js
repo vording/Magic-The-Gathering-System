@@ -292,6 +292,15 @@ function pickTarget(target) {
     const t = ui.targeting;
     const spec = t.specs[t.i];
     Sound.play('button');
+    // 複数の対象：選び終わったら「完了」（最大の数で自動で次へ）
+    if (spec?.multi) {
+      const list = t.targets[t.i]?.multi ?? [];
+      if (list.some((x) => sameT(x, target))) return toast('同じ対象は1回だけ選べます');
+      t.targets[t.i] = { multi: [...list, target] };
+      const max = spec.multi.max === 'X' ? t.x : spec.multi.max;
+      if (list.length + 1 >= max) return nextTarget();
+      return render();
+    }
     // 割り振るダメージ：対象ごとに点数を決める
     if (spec?.divided) {
       const total = divideTotal(t);
@@ -309,7 +318,16 @@ function pickTarget(target) {
     return nextTarget();
   }
   const n = Engine.needs(G);
-  if (n?.type === 'triggerTarget' && n.player === ME) act(ME, { type: 'target', target });
+  if (n?.type === 'triggerTarget' && n.player === ME) {
+    // 複数の対象を取る誘発：選び終わったら「完了」
+    if (n.pending.spec.multi) {
+      ui.trigMulti = [...(ui.trigMulti ?? []), target];
+      const max = n.pending.spec.multi.max === 'X' ? 99 : n.pending.spec.multi.max;
+      if (ui.trigMulti.length >= max) { const list = ui.trigMulti; ui.trigMulti = null; return act(ME, { type: 'target', target: { multi: list } }); }
+      return render();
+    }
+    act(ME, { type: 'target', target });
+  }
 }
 
 const sameT = (a, b) => a.player === b.player && a.obj === b.obj && a.stack === b.stack && a.grave === b.grave;
@@ -642,6 +660,15 @@ function renderBanner(n) {
   if (ui.targeting || (n?.player === ME && n.type === 'triggerTarget')) {
     const name = ui.targeting ? G.objects[ui.targeting.id].card.name : n.pending.name;
     const spec = ui.targeting?.specs[ui.targeting.i];
+    if (spec?.multi) {
+      const list = ui.targeting.targets[ui.targeting.i]?.multi ?? [];
+      const max = spec.multi.max === 'X' ? ui.targeting.x : spec.multi.max;
+      const min = spec.multi.min === 'X' ? ui.targeting.x : spec.multi.min;
+      const players = cands.filter((c) => c.player != null).map((c) => button(c.player === ME ? 'あなた（自分）' : `${G.players[c.player].name}（相手）`, () => pickTarget(c), c.player === OPP));
+      return show(span(`「${name}」の対象を選んでください（${list.length}/${max}）`), span('光っているカードをクリック', 'block-hint'), ...players,
+        button('完了', () => { if (list.length < Math.min(min, cands.length)) return toast('対象が足りません'); if (!list.length) ui.targeting.targets[ui.targeting.i] = { multi: [] }; nextTarget(); }, true),
+        button('キャンセル', cancelTargeting));
+    }
     if (spec?.divided) {
       const parts = ui.targeting.targets[ui.targeting.i]?.divide ?? [];
       const rest = divideTotal(ui.targeting) - parts.reduce((a, x) => a + x.n, 0);
@@ -650,6 +677,7 @@ function renderBanner(n) {
     }
     const players = cands.filter((c) => c.player != null).map((c) => button(c.player === ME ? 'あなた（自分）' : `${G.players[c.player].name}（相手）`, () => pickTarget(c), c.player === OPP));
     const extra = ui.targeting ? [button('キャンセル', cancelTargeting)] : G.triggers[0]?.optional ? [button('選ばない', () => act(ME, { type: 'skip' }))] : [];
+    if (!ui.targeting && n.pending.spec.multi) extra.unshift(button(`完了（${ui.trigMulti?.length ?? 0}）`, () => { const list = ui.trigMulti ?? []; ui.trigMulti = null; act(ME, { type: 'target', target: { multi: list } }); }, true));
     const graves = cands.filter((c) => c.grave != null);
     if (graves.length) openViewer({ title: '墓地から対象を選ぶ', ids: graves.map((c) => c.grave), hint: 'カードをクリックして選ぶ' });
     return show(span(`「${name}」の対象を選んでください`), ...(cands.some((c) => c.obj != null || c.stack != null) ? [span('光っているカードをクリック', 'block-hint')] : []), ...players, ...extra);

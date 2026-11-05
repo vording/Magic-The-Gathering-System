@@ -63,6 +63,27 @@ const AI = (() => {
     const best = (list, f = (t) => value(G, t.obj)) => [...list].sort((a, b) => f(b) - f(a))[0] ?? null;
     const n = fx.n === 'X' ? x : fx.n;
     const crt = (t) => isT(G, t.obj, 'creature');
+    // 複数の対象：1つ目と同じ考えで、よいものから順に
+    if (spec.multi) {
+      const single = { ...spec, multi: null };
+      const max = spec.multi.max === 'X' ? x : spec.multi.max;
+      const picks = [];
+      const pool = E().targetsFor(G, p, single, srcId, colors ?? []);
+      for (let i = 0; i < max && pool.length; i++) {
+        const tg = chooseTarget(G, p, fx, single, x, mode, srcId, colors);
+        if (!tg) break;
+        if (picks.some((q2) => JSON.stringify(q2) === JSON.stringify(tg))) {
+          const rest = pool.filter((c) => !picks.some((q2) => JSON.stringify(q2) === JSON.stringify(c)) && (c.obj == null || (fx.type === 'pump' || fx.type === 'counters' || fx.type === 'prevent' ? o(G, c.obj).controller === p : o(G, c.obj).controller !== p)));
+          if (!rest.length) break;
+          picks.push(rest[0]);
+          pool.splice(pool.indexOf(rest[0]), 1);
+        } else picks.push(tg);
+      }
+      const min = spec.multi.min === 'X' ? x : spec.multi.min;
+      if (picks.length < Math.min(min, pool.length + picks.length)) return null;
+      if (!picks.length && min > 0) return null;
+      return { multi: picks };
+    }
     // 割り振るダメージ：倒せるクリーチャーから順に、残りは相手へ
     if (spec.divided) {
       let rest = n;
@@ -280,10 +301,13 @@ const AI = (() => {
 
   // ---------- 起動型能力 ----------
 
+  // 同じ能力をこのターンに何度も起動しない（コストのない能力で止まらなくなるのを防ぐ）
+  const overused = (G, id, index) => { const u = o(G, id)?.usedCount?.[index]; return u?.turn === G.turn && u.n >= 10; };
+
   function abilityPlan(G, p, mode) {
     for (const id of [...bfOf(G, p), ...G.players[p].hand]) {
       for (const a of E().activations(G, p, id)) {
-        if (!a.ok || a.mana) continue;
+        if (!a.ok || a.mana || overused(G, id, a.index)) continue;
         const ab = E().abilitiesOf(G, id)[a.index];
         const fx = ab.effects;
         const kinds = fx.map((f) => f.type);
@@ -428,7 +452,7 @@ const AI = (() => {
       if (!fightNow && u.side === 'me' && !defending) {
         for (const a of E().activations(G, p, id)) {
           const ab = E().abilitiesOf(G, id)[a.index];
-          if (a.ok && !a.mana && ab.effects.every((f) => f.type === 'selfPump' && f.p > 0)) return { type: 'activate', id, index: a.index, targets: [] };
+          if (a.ok && !a.mana && !overused(G, id, a.index) && ab.effects.every((f) => f.type === 'selfPump' && f.p > 0)) return { type: 'activate', id, index: a.index, targets: [] };
         }
         continue;
       }
@@ -445,7 +469,7 @@ const AI = (() => {
       }
       for (const a of E().activations(G, p, id)) {
         const ab = E().abilitiesOf(G, id)[a.index];
-        if (a.ok && !a.mana && ab.effects.every((f) => f.type === 'selfPump')) return { type: 'activate', id, index: a.index, targets: [] };
+        if (a.ok && !a.mana && !overused(G, id, a.index) && ab.effects.every((f) => f.type === 'selfPump')) return { type: 'activate', id, index: a.index, targets: [] };
       }
     }
     return null;

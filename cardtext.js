@@ -40,7 +40,8 @@ const CardText = (() => {
       const p = part.trim();
       const l = p.toLowerCase();
       if (/^(\{[^}]+\})+$/.test(p)) {
-        for (const [, sym] of p.matchAll(/\{([^}]+)\}/g)) {
+        for (const [, raw] of p.matchAll(/\{([^}]+)\}/g)) {
+          const sym = raw.toUpperCase(); // オーラが与える能力の文は小文字になっている
           if (sym === 'T') cost.tap = true;
           else if (sym === 'Q') cost.untap = true;
           else cost.mana += `{${sym}}`;
@@ -54,6 +55,7 @@ const CardText = (() => {
       else if (/^pay (\d+) life$/.test(l)) cost.life = Number(/^pay (\d+) life$/.exec(l)[1]);
       else if (/^sacrifice an? ([a-z]+)$/.test(l)) cost.sacType = /^sacrifice an? (\w+)$/.exec(l)[1];
       else if (/^sacrifice a permanent$/.test(l)) cost.sacType = 'permanent';
+      else if (/^return an? (\w+) you control to its owner's hand$/.test(l)) cost.returnType = /^return an? (\w+) /.exec(l)[1];
       else if (/^remove an? \+1\/\+1 counter from this$/.test(l)) cost.removeCounter = 1;
       else if (/^remove (two|three) \+1\/\+1 counters from this$/.test(l)) cost.removeCounter = num(/^remove (\w+) /.exec(l)[1]);
       else if (/^remove an? (\w+) counter from this$/.test(l)) cost.removeNamed = /^remove an? (\w+) counter from this$/.exec(l)[1];
@@ -148,10 +150,15 @@ const CardText = (() => {
       if (!c || !Number.isFinite(k)) return null;
       return { s: `${m[1]}x ${m[3]}${m[5] ?? ''}`.replace(/draw x card$/, 'draw x cards'), amount: { count: c, mult: k } };
     }
-    if ((m = /^(.*?)gets \+(\d+)\/\+(\d+) (until end of turn )?for each (.+)$/.exec(s))) {
+    if ((m = /^(.*?)gets? \+(\d+)\/\+(\d+) (until end of turn )?for each (.+)$/.exec(s))) {
       const c = parseCount(m[5]);
       if (!c) return null;
-      return { s: `${m[1]}gets +x/+x ${m[4] ?? ''}`.trim(), amount: { count: c, mult: Number(m[2]) } };
+      return { s: `${m[1]}${m[1].startsWith('all creatures') ? 'get' : 'gets'} +x/+x ${m[4] ?? ''}`.trim(), amount: { count: c, mult: Number(m[2]) } };
+    }
+    if ((m = /^(.*?)gets? -(\d+)\/-(\d+) (until end of turn )?for each (.+)$/.exec(s))) {
+      const c = parseCount(m[5]);
+      if (!c) return null;
+      return { s: `${m[1]}${m[1].startsWith('all creatures') ? 'get' : 'gets'} -x/-x ${m[4] ?? ''}`.trim(), amount: { count: c, mult: Number(m[2]) } };
     }
     return amount;
   }
@@ -219,6 +226,22 @@ const CardText = (() => {
       return a ? [...(Array.isArray(a) ? a : [a]), { type: m[2] === 'gain' ? 'gain' : 'loseSelf', n: num(m[3]) }] : null;
     }
     if ((m = /^(that creature|it) can't be regenerated$/.exec(s))) return { type: 'noRegen' };
+    if (s === 'target opponent gains control of it') return { type: 'giveControl', target: { kind: 'player', players: ['opp'] } };
+    if ((m = /^(target player|that player|target opponent) discards their hand$/.exec(s))) return { type: 'discardHand', target: { kind: 'player', players: m[1] === 'target player' ? ['me', 'opp'] : ['opp'] } };
+    if ((m = new RegExp(`^discards ${N} cards?$`).exec(s))) return { type: 'discard', n: num(m[1]), sameTarget: true, target: { kind: 'player', players: ['opp'] } };
+    if (s === 'exile target player\'s graveyard') return { type: 'exileGraveAll', target: { kind: 'player', players: ['me', 'opp'] } };
+    if (s === 'put a -1/-1 counter on enchanted creature') return { type: 'countersAttached', minus: true, n: 1 };
+    if (s === 'put a +1/+1 counter on enchanted creature') return { type: 'countersAttached', n: 1 };
+    if ((m = /^(that player|target player) returns a creature they control to its owner's hand$/.exec(s))) return { type: 'returnOwnPlayer', what: 'creature', target: { kind: 'player', players: ['me', 'opp'] } };
+    if ((m = /^return a (white|blue|black|red|green) creature you control to its owner's hand$/.exec(s))) return { type: 'returnOwn', what: m[1] };
+    if (s === 'remove target attacking creature you control from combat and untap it') return { type: 'removeFromCombat', target: { kind: 'card', filter: { types: ['creature'], non: [], colors: [], state: ['attacking'], side: 'me' } } };
+    if ((m = new RegExp(`^reveal the top ${N} cards of your library$`).exec(s))) return { type: 'revealTop', n: num(m[1]) };
+    if ((m = /^put all (land|creature|goblin|elf|zombie|sliver|wizard) cards revealed this way into your hand and the rest (into your graveyard|on the bottom of your library(?: in any order)?)$/.exec(s))) {
+      return { type: 'revealTake', what: m[1], rest: m[2].startsWith('into') ? 'graveyard' : 'bottom' };
+    }
+    if ((m = /^put all creature cards of the chosen type revealed this way into your hand and the rest (into your graveyard|on the bottom of your library(?: in any order)?)$/.exec(s))) {
+      return { type: 'revealTake', what: 'chosen', rest: m[1].startsWith('into') ? 'graveyard' : 'bottom' };
+    }
     if (/^search its controller's graveyard, hand, and library for all cards with the same name as that (?:creature|enchantment|artifact|land|spell) and exile them$/.test(s)) return { type: 'exileSameName' };
     if (s === 'then that player shuffles' || s === 'that player shuffles') return { type: 'none' };
     if ((m = /^(target player|you) shuffles? (?:their|your) graveyard into (?:their|your) library$/.exec(s))) return { type: 'shuffleGraveIn', target: m[1] === 'you' ? { kind: 'player', players: ['me'], auto: true } : { kind: 'player', players: ['me', 'opp'] } };
@@ -462,6 +485,16 @@ const CardText = (() => {
   // 対象を取るよくある文（rules.js で読めなかった対象の書き方）
   function generic(s) {
     let m;
+    // 複数の対象：「up to three target creatures can't block this turn」「two target lands」
+    if ((m = /^(.*?)\b(up to (one|two|three|four)|two|three|x) target (.+)$/.exec(s)) && !/^this deals/.test(s)) {
+      const max = m[3] ? num(m[3]) : m[2] === 'x' ? 'X' : num(m[2]);
+      const min = m[3] ? 0 : max;
+      const tail = m[4].replace(/\b(creatures|lands|cards|permanents|artifacts|enchantments)\b/, (w) => w.replace(/s$/, ''));
+      const inner = effect1(`${m[1]}target ${tail}`.replace(/ get /, ' gets ').replace(/ can't block this turn$/, ' can\'t block this turn').replace(/ to their owners?'s? hands?$/, " to its owner's hand").replace(/ on top of their owners' libraries$/, " on top of its owner's library").replace(/ to your hand$/, ' to your hand'), null);
+      const f = Array.isArray(inner) ? null : inner;
+      if (f?.target && !f.target.auto) { f.target = { ...f.target, multi: { min, max } }; return f; }
+      return null;
+    }
     if ((m = /^(destroy|exile|tap|untap) target (.+)$/.exec(s))) {
       const t = targetPhrase(m[2]);
       return t ? { type: m[1], target: t } : null;
@@ -523,6 +556,10 @@ const CardText = (() => {
         if (f.type !== 'none') out.push(f);
       }
     }
+    for (let i = 0; i < out.length; i++) {
+      if (out[i].type === 'revealTop' && out[i + 1]?.type === 'revealTake') out.splice(i, 2, { ...out[i + 1], n: out[i].n });
+    }
+    if (out.some((f) => f.type === 'revealTop' || (f.type === 'revealTake' && f.n == null))) return null;
     // 「上からN枚を見る」＋「1枚を手札に、残りを〜」はまとめて1つの効果に
     for (let i = 0; i < out.length; i++) {
       if (out[i].type !== 'look') continue;
@@ -562,6 +599,7 @@ const CardText = (() => {
     [/^whenever this deals damage to (a player|an opponent)$/, 'dealsDamagePlayer', (m) => ({ opp: m[1] === 'an opponent' }), 'player'],
     [/^whenever this deals combat damage to (a player|an opponent)$/, 'combatDamagePlayer', null, 'player'],
     [/^whenever this is dealt damage$/, 'dealtDamage'],
+    [/^whenever this is dealt combat damage$/, 'dealtCombatDamage'],
     [/^whenever (an opponent|a player) draws a card$/, 'drawCard', (m) => ({ opp: m[1] === 'an opponent' }), 'player'],
     [/^whenever (an opponent|a player) discards a card$/, 'discard', (m) => ({ opp: m[1] === 'an opponent' }), 'player'],
     [/^whenever a creature dealt damage by this this turn dies$/, 'damagedDies', null, 'obj'],
@@ -665,6 +703,18 @@ const CardText = (() => {
     }
     // 攻撃・ブロックの制限
     if (s === 'this can\'t be blocked except by walls') return { kind: 'self', blockOnly: 'wall' };
+    if ((m = /^(artifacts|creatures|lands|artifacts and lands|artifacts, creatures, and lands) enter tapped$/.exec(s))) return { kind: 'global', entersTapped: m[1].replace(/,? and |, /g, ' ').split(' ').map((w) => w.replace(/s$/, '')) };
+    if (s === 'you can\'t cast creature spells') return { kind: 'player', noCreatureSpells: true };
+    if ((m = /^(islands|forests|swamps|mountains|plains|creatures|red creatures|blue creatures|black creatures|white creatures|green creatures) don't untap during their controllers' untap steps$/.exec(s))) {
+      const w = m[1].split(' ');
+      return { kind: 'global', noUntap: w.length === 2 ? { types: ['creature'], color: COLOR_WORDS[w[0]] } : m[1] === 'creatures' ? { types: ['creature'] } : { subtype: m[1].replace(/s$/, '') } };
+    }
+    if ((m = /^creatures with power (\d+) or greater don't untap during their controllers' untap steps$/.exec(s))) return { kind: 'global', noUntap: { types: ['creature'], powerGE: Number(m[1]) } };
+    if (s === 'if a source would deal damage to you, prevent 1 of that damage') return { kind: 'player', preventOne: true };
+    if (s === 'prevent all damage that would be dealt to this by creatures') return { kind: 'self', preventFromCreatures: true };
+    if (s === 'this can\'t block or be blocked by creatures with power 2 or greater') return { kind: 'self', cantBlockPower: { n: 2, ge: true }, notBlockedByPowerGE: 2 };
+    if ((m = /^as long as this is enchanted, it gets ([+-]\d+)\/([+-]\d+) and has ([a-z ,]+)$/.exec(s))) return { kind: 'self', p: Number(m[1]), t: Number(m[2]), kw: kwList(m[3]), ifEnchanted: true };
+    if (s === 'enchanted creature gets +1/+1 and can\'t be blocked except by creatures with flying') return { kind: 'attached', p: 1, t: 1, kw: [], blockOnlyKw: 'flying' };
     if (s === 'this can\'t be blocked as long as it\'s attacking alone') return { kind: 'self', unblockableAlone: true };
     if (s === 'this can\'t be blocked by walls') return { kind: 'self', notBlockedBy: 'wall' };
     if (s === 'this can\'t be blocked by more than one creature') return { kind: 'self', maxBlockers: 1 };
@@ -845,12 +895,14 @@ const CardText = (() => {
         const bound = hit ? bindTrigger(body.replace(/^you may (?!pay)/i, ''), hit[0][3]) : null;
         // 「if this is untapped, …」は誘発する・解決するときの条件
         let ifUntapped = false;
+        let ifNotKicked = false;
+        if (bound && /^if this wasn't kicked, /i.test(bound.text)) { ifNotKicked = true; bound.text = bound.text.replace(/^if this wasn't kicked, /i, '').replace(/^sacrifice it/i, 'sacrifice this'); }
         if (bound && /^if this is untapped, /i.test(bound.text)) { ifUntapped = true; bound.text = bound.text.replace(/^if this is untapped, /i, ''); }
         const fx = hit && (!/^if /i.test(bound?.text ?? body) || /^if there are no \w+ counters on this/i.test(body)) ? effects(bound.text, def) : null;
         if (hit && fx) {
           if (bound.bound) for (const f of fx) if (f.target && !f.target.auto) f.target = { ...f.target, bound: bound.bound };
           const cond = hit[0][2] ? hit[0][2](hit[1]) : null;
-          def.triggers.push({ event: hit[0][1], cond: ifUntapped ? { ...(cond ?? {}), ifUntapped: true } : cond, effects: fx, optional: /^you may /i.test(body), text: line });
+          def.triggers.push({ event: hit[0][1], cond: ifUntapped || ifNotKicked ? { ...(cond ?? {}), ...(ifUntapped ? { ifUntapped: true } : {}), ...(ifNotKicked ? { ifNotKicked: true } : {}) } : cond, effects: fx, optional: /^you may /i.test(body), text: line });
           continue;
         }
         // 「When you control no Islands, sacrifice this」などは常在型能力として読む
@@ -872,6 +924,7 @@ const CardText = (() => {
             else if (x.kind === 'etbNamed') def.etbNamed = { ...(def.etbNamed ?? {}), [x.name]: x.n };
             else if (x.kind === 'sacIfNo') def.sacIfNo = x.what;
             else if (x.kind === 'player') def.playerStatics = { ...(def.playerStatics ?? {}), ...x };
+            else if (x.kind === 'global') def.globalStatics = [...(def.globalStatics ?? []), x];
             else def.statics.push(x);
           }
           continue;
