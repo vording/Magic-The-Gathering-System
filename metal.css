@@ -1,0 +1,147 @@
+/* メタリックな仕上げ（各画面の CSS の後に読み込んで、パネル・見出し・ボタン・バーに金属の質感を足す）
+   ・見出しとバー：上が明るく中央に境目のある、磨いた鋼の帯
+   ・パネル：暗いガンメタルに細いヘアライン（横の筋）と銀の縁
+   ・ボタン：クロームのような光沢。押すと凹む */
+:root {
+  --hairline: repeating-linear-gradient(0deg, rgba(255, 255, 255, .018) 0 1px, rgba(0, 0, 0, .025) 1px 2px, transparent 2px 3px);
+  --steel-head: linear-gradient(180deg, #9a9ea5 0%, #6a6e75 7%, #50545a 48%, #3f4247 52%, #33363a 100%);
+  --steel-bar: linear-gradient(180deg, #6e7279 0%, #4a4d53 45%, #36383c 55%, #2a2c2f 100%);
+  --gunmetal: linear-gradient(180deg, #45484d 0%, #383a3e 40%, #2e3033 100%);
+  --chrome: linear-gradient(180deg, #8d9198 0%, #62666c 46%, #4c4f54 54%, #3d4044 100%);
+  --chrome-hover: linear-gradient(180deg, #a3a7ae 0%, #73777e 46%, #5b5e64 54%, #4a4d52 100%);
+  --chrome-down: linear-gradient(180deg, #2f3135 0%, #3c3f43 50%, #4a4d52 100%);
+  --rim: 0 0 0 1px #000, inset 0 0 0 1px rgba(190, 196, 206, .45), inset 0 2px 0 rgba(255, 255, 255, .16), inset 0 -2px 0 rgba(0, 0, 0, .35), 0 2px 6px rgba(0, 0, 0, .45);
+  --sheen: linear-gradient(115deg, rgba(255, 255, 255, .07) 0%, rgba(255, 255, 255, 0) 28%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, .04) 100%);
+  --raised: inset 1px 1px rgba(255, 255, 255, .35), inset -1px -1px rgba(0, 0, 0, .6);
+}
+
+body { background: var(--hairline), radial-gradient(ellipse at 50% 0%, #3c3f44, #232427 75%) fixed; }
+html:not(.phone) .app, .app { background: transparent; }
+
+/* ---------- バー ---------- */
+.topbar {
+  background: var(--hairline), var(--steel-bar);
+  border-bottom: 1px solid #000;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .25), 0 1px 0 rgba(180, 186, 196, .25), 0 3px 8px rgba(0, 0, 0, .5);
+}
+.bottombar {
+  background: var(--hairline), var(--steel-bar);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .22);
+}
+.bottombar .active { background: var(--chrome-down); color: #fff; }
+.top-tabs a, .top-tabs span {
+  background: var(--steel-bar);
+  text-shadow: 0 1px 1px #000;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .25), inset 1px 0 rgba(255, 255, 255, .08);
+}
+.top-tabs a:hover { background: var(--chrome-hover); color: #fff; }
+.top-tabs .active { background: var(--chrome); color: #fff; box-shadow: inset 0 -2px #e8c66a, inset 0 1px rgba(255, 255, 255, .4); }
+
+/* ---------- パネルと見出し ---------- */
+.panel,
+dialog,
+.col-left, .col-player,
+html:not(.phone) .col-left, html:not(.phone) .col-player, html:not(.phone) .col-right .panel,
+html:not(.phone) .layout > .panel,
+html:not(.phone) body.duel .player-block,
+html:not(.phone) body.duel .status-box {
+  background: var(--sheen), var(--hairline), var(--gunmetal);
+  border: 1px solid #000;
+  box-shadow: var(--rim);
+}
+html:not(.phone) body.duel .status-box { border-left: 3px solid #7fb2ff; }
+.panel-head,
+.zone-label, html:not(.phone) .zone-label,
+.opp-status, html:not(.phone) .opp-status,
+.filter-title,
+html:not(.phone) body.duel .stack-label {
+  color: #f2f2f2;
+  background: var(--hairline), var(--steel-head);
+  border-bottom: 1px solid #000;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .85);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .35), inset 0 -1px rgba(0, 0, 0, .4);
+}
+.deck h3 {
+  background: linear-gradient(180deg, #55585e, #3b3d41);
+  color: #e6e6e6;
+  text-shadow: 0 1px #000;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .18);
+}
+.list, .chat, .well {
+  background-color: #1f2023;
+  border-color: #000;
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .8), 0 1px 0 rgba(200, 206, 216, .18);
+}
+.card-frame {
+  background: linear-gradient(135deg, #f4f4f2, #c9cbce 45%, #eeeeec 55%, #b8babd);
+  box-shadow: inset 1px 1px #fff, inset -1px -1px #8a8c90, 0 0 0 1px #000;
+}
+
+/* ---------- ボタン ---------- */
+button {
+  background: var(--chrome);
+  border: 1px solid #0c0c0d;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .9);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .4), inset 0 -1px rgba(0, 0, 0, .35), 0 1px 1px rgba(0, 0, 0, .5);
+}
+button:hover:not(:disabled) { background: var(--chrome-hover); }
+button:active:not(:disabled) { background: var(--chrome-down); box-shadow: inset 0 2px 3px rgba(0, 0, 0, .7); }
+button:disabled { background: linear-gradient(180deg, #4d5055, #3a3c40); color: #7d8086; text-shadow: none; }
+button.primary {
+  color: #fff;
+  outline: none;
+  background: linear-gradient(180deg, #b7bcc4 0%, #7c828b 45%, #5f646c 55%, #4b4f56 100%);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .55), inset 0 -1px rgba(0, 0, 0, .4), 0 0 0 1px rgba(232, 198, 106, .45), 0 1px 2px rgba(0, 0, 0, .6);
+}
+button.primary:hover:not(:disabled) { background: linear-gradient(180deg, #cdd2d9 0%, #8e949d 45%, #6f747c 55%, #585c63 100%); }
+/* 丸いボタン・カード・一覧のボタンは金属にしない */
+.felt-swatch, .felt-swatch:hover:not(:disabled), .felt-swatch:active:not(:disabled) { background: var(--swatch) 50% 55% / 320% no-repeat; box-shadow: 0 0 0 1px #9aa0a8, 0 1px 2px #000; text-shadow: none; }
+.felt-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px #e8e8e8, 0 0 6px rgba(255, 255, 255, .5); }
+.result, .result:hover:not(:disabled), .result:active:not(:disabled),
+.art-option, .art-option:hover:not(:disabled), .art-option:active:not(:disabled) { background: none; box-shadow: none; text-shadow: none; }
+.mana-pip, .mana-pip:hover:not(:disabled), .mana-pip:active:not(:disabled) { text-shadow: none; }
+.pip-w { background: radial-gradient(circle at 35% 30%, #fff, #e8e2c4); } .pip-u { background: radial-gradient(circle at 35% 30%, #d6ecff, #7fb3e3); }
+.pip-b { background: radial-gradient(circle at 35% 30%, #d4cdce, #8a7f80); } .pip-r { background: radial-gradient(circle at 35% 30%, #ffc6b3, #e0704f); }
+.pip-g { background: radial-gradient(circle at 35% 30%, #cdf0d8, #6fbb88); } .pip-c { background: radial-gradient(circle at 35% 30%, #f2efed, #aaa39f); }
+.pip-m { background: linear-gradient(135deg, #f8f4dc, #9cc9ef, #a99fa0, #f09477, #9bd3ae); }
+
+/* ---------- 入力 ---------- */
+input[type="search"], input[type="text"], select, input[type="checkbox"] {
+  background-color: #1d1e21;
+  border-color: #000;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, .8), 0 1px 0 rgba(200, 206, 216, .2);
+}
+
+/* ---------- ルール対戦・一人回しの部品 ---------- */
+html:not(.phone) body.duel .board > .phases {
+  background: var(--hairline), var(--steel-bar);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .25), inset 0 -1px rgba(0, 0, 0, .5);
+}
+html:not(.phone) body.duel .board > .phases button,
+html:not(.phone) body.duel .board > .phases button:disabled { background: none; box-shadow: none; color: #b4b8be; text-shadow: 0 1px #000; }
+html:not(.phone) body.duel .board > .phases button.current,
+html:not(.phone) body.duel .board > .phases button.current:disabled {
+  color: #fff;
+  background: var(--chrome);
+  box-shadow: 0 0 0 1px #000, 0 0 0 2px #e8c66a, 0 0 10px rgba(232, 198, 106, .45), inset 0 1px rgba(255, 255, 255, .4);
+}
+.phases { background: #1f2023; border-color: #000; }
+.phases button, .phases button:disabled, .phases button:hover:not(:disabled), .phases button:active:not(:disabled) { background: none; box-shadow: none; }
+.phases button.current, .phases button.current:disabled { background: var(--chrome); color: #fff; }
+.hand-area, html:not(.phone) .hand-area { background: var(--hairline), linear-gradient(180deg, #2c2e31, #1d1e20); }
+.player-name, html:not(.phone) body.duel .player-block .player-name {
+  background: var(--steel-head);
+  color: #f2f2f2;
+  text-shadow: 0 1px 1px #000;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .3), 0 0 0 1px #000;
+}
+html:not(.phone) body.duel .player-block .avatar { border: 2px solid #000; box-shadow: 0 0 0 1px #9aa0a8, inset 0 0 12px rgba(0, 0, 0, .6); }
+html:not(.phone) body.duel .player-block.active .avatar { box-shadow: 0 0 0 1px #9aa0a8, 0 0 0 3px #7fb2ff, 0 0 14px rgba(127, 178, 255, .7); }
+html:not(.phone) body.duel .player-block .pile { background: linear-gradient(180deg, #2a2c2f, #1c1d20); box-shadow: inset 0 1px 2px #000, 0 1px 0 rgba(200, 206, 216, .18); }
+html:not(.phone) body.duel .stack-panel { background: var(--hairline), var(--gunmetal); box-shadow: var(--rim), 0 8px 24px rgba(0, 0, 0, .6); }
+.stack-panel { background: linear-gradient(180deg, rgba(60, 63, 68, .95), rgba(34, 36, 39, .95)); border-color: #000; box-shadow: inset 0 1px rgba(255, 255, 255, .2); }
+.announce { background: var(--hairline), linear-gradient(180deg, rgba(64, 67, 72, .96), rgba(28, 29, 32, .96)); box-shadow: inset 0 1px rgba(255, 255, 255, .25), 0 0 0 1px #000, 0 10px 30px rgba(0, 0, 0, .7); }
+.banner, .menu, .toast { background: var(--hairline), linear-gradient(180deg, rgba(64, 67, 72, .97), rgba(32, 33, 36, .97)); border-color: #000; box-shadow: inset 0 1px rgba(255, 255, 255, .22), 0 0 0 1px rgba(170, 176, 186, .3), 0 6px 18px rgba(0, 0, 0, .6); }
+.deck-item, .deck-item:hover:not(:disabled), .deck-item:active:not(:disabled) { background: var(--chrome); }
+.deck-item.current { background: linear-gradient(180deg, #a9aeb6 0%, #6f747b 46%, #585c62 54%, #474a50 100%); box-shadow: inset 3px 0 #e8c66a, inset 0 1px rgba(255, 255, 255, .4); }
+.deck-item-info { color: #d4d6da; }
