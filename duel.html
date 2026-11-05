@@ -6,8 +6,8 @@
   <title>ルール対戦 — Magic: The Gathering System</title>
   <link rel="stylesheet" href="theme.css?v=24">
   <link rel="stylesheet" href="play.css?v=42">
-  <link rel="stylesheet" href="duel.css?v=1">
-  <script src="i18n.js?v=21"></script>
+  <link rel="stylesheet" href="duel.css?v=2">
+  <script src="i18n.js?v=22"></script>
   <script src="device.js?v=1"></script>
   <script src="felt.js?v=7"></script>
   <script src="zoom.js?v=2"></script>
@@ -51,6 +51,7 @@
           <div class="player-name" id="opp-player-name"></div>
           <div class="life"><span id="opp-life" class="opp-life"></span></div>
           <div class="pool" id="opp-pool"></div>
+          <div class="mana-avail" id="opp-mana" title="アンタップ状態の土地などから出せるマナ"></div>
           <div class="piles">
             <div class="pile static" title="ライブラリーの枚数">
               <span class="pile-icon icon-library" aria-hidden="true"></span>
@@ -78,6 +79,7 @@
         <div class="player-name" id="my-player-name">あなた</div>
         <div class="life"><span id="life"></span></div>
         <div class="pool" id="my-pool" title="マナ・プール"></div>
+        <div class="mana-avail" id="my-mana" title="アンタップ状態の土地などから出せるマナ（呪文を唱えると自動で支払われます）"></div>
         <div class="piles">
           <div class="pile static" id="pile-library" title="ライブラリーの枚数">
             <span class="pile-icon icon-library" aria-hidden="true"></span>
@@ -98,6 +100,8 @@
       </aside>
 
       <section class="board">
+        <div id="ticker" class="ticker" aria-live="polite"></div>
+        <div id="announce" class="announce" hidden></div>
         <div id="opp-area" class="opp-area">
           <div id="opp-status" class="opp-status"></div>
           <div id="room-banner" class="room-banner" hidden>
@@ -228,8 +232,8 @@
   <script src="rules.js?v=3"></script>
   <script src="cards.js?v=1"></script>
   <script src="cardtext.js?v=7"></script>
-  <script src="engine.js?v=7"></script>
+  <script src="engine.js?v=8"></script>
   <script src="ai.js?v=7"></script>
-  <script src="duel.js?v=6"></script>
+  <script src="duel.js?v=7"></script>
 </body>
 </html>
