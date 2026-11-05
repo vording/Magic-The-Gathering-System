@@ -391,6 +391,107 @@ if (pool) {
     passBoth(H);
     assert.equal(H.objects[id(H, 'Hunting Moa')].counters.p1, 1);
   };
+  tests['real cards: manlands, control, cost, extra turns'] = () => {
+    const G = setup({ p0: { bf: [P('Treetop Village'), L.Forest, L.Forest] } });
+    const tv = id(G, 'Treetop Village');
+    const ab = Engine.activations(G, 0, tv).find((a) => !a.mana);
+    ok(Engine.perform(G, 0, { type: 'activate', id: tv, index: ab.index }));
+    passBoth(G);
+    assert.ok(Engine.isType(G, tv, 'creature'));
+    assert.equal(Engine.ch(G, tv).p, 3);
+    assert.ok(Engine.ch(G, tv).kw.has('trample'));
+    const C = setup({ p0: { hand: [P('Confiscate')], bf: Array(6).fill(L.Island) }, p1: { bf: [K.giant] } });
+    ok(Engine.perform(C, 0, { type: 'cast', id: id(C, 'Confiscate'), targets: [{ obj: id(C, 'Hill Giant') }] }));
+    passBoth(C);
+    assert.equal(C.objects[id(C, 'Hill Giant')].controller, 0);
+    const T = setup({ p0: { hand: [P('Threaten')], bf: [L.Mountain, L.Mountain, L.Mountain] }, p1: { bf: [K.giant] } });
+    ok(Engine.perform(T, 0, { type: 'cast', id: id(T, 'Threaten'), targets: [{ obj: id(T, 'Hill Giant') }] }));
+    passBoth(T);
+    assert.equal(T.objects[id(T, 'Hill Giant')].controller, 0);
+    assert.ok(Engine.canAttack(T, id(T, 'Hill Giant')) || T.step !== 'main1');
+    const M = setup({ p0: { hand: [K.bears], bf: [P('Emerald Medallion'), L.Forest] } });
+    assert.ok(Engine.castInfo(M, 0, id(M, 'Grizzly Bears')).ok); // {1}{G} → {G}
+    const W = setup({ p0: { hand: [P('Time Warp')], bf: Array(5).fill(L.Island) } });
+    ok(Engine.perform(W, 0, { type: 'cast', id: id(W, 'Time Warp'), targets: [{ player: 0 }] }));
+    passBoth(W);
+    assert.deepEqual(W.extraTurns, [0]);
+  };
+  tests['real cards: end of combat, shroud, moat, howling mine'] = () => {
+    const G = setup({ p0: { bf: [K.giant] }, p1: { bf: [P('Cockatrice')] }, step: 'begincombat' });
+    passBoth(G);
+    ok(Engine.perform(G, 0, { type: 'attackers', ids: [id(G, 'Hill Giant')] }));
+    passBoth(G);
+    ok(Engine.perform(G, 1, { type: 'blockers', blocks: { [id(G, 'Cockatrice')]: id(G, 'Hill Giant') } }));
+    for (let i = 0; i < 8 && G.step !== 'main2'; i++) passBoth(G);
+    assert.equal(G.objects[id(G, 'Hill Giant')].zone, 'graveyard');
+    const S = setup({ p0: { hand: [K.bolt], bf: [L.Mountain] }, p1: { bf: [P('Ivory Mask')] } });
+    assert.ok(!Engine.targetsFor(S, 0, CardText.compile(K.bolt).spell[0].target).some((t) => t.player === 1));
+    const Mt = setup({ p0: { bf: [K.giant] }, p1: { bf: [P("Teferi's Moat")] } });
+    Mt.objects[id(Mt, "Teferi's Moat")].chosen = 'red';
+    assert.equal(Engine.canAttack(Mt, id(Mt, 'Hill Giant')), false);
+    const H = setup({ p0: { bf: [P('Howling Mine')] } });
+    const before = H.players[0].hand.length;
+    H.step = 'upkeep'; H.stepBegun = true; H.priority = 0;
+    passBoth(H); // → draw step: draw 1 + Howling Mine trigger
+    passBoth(H);
+    assert.equal(H.players[0].hand.length, before + 2);
+  };
+  tests['real cards: divided damage, granted abilities, sac unless, same name'] = () => {
+    const G = setup({ p0: { hand: [P('Arc Lightning')], bf: [L.Mountain, L.Mountain, L.Mountain] }, p1: { bf: [K.bears, P('Llanowar Elves')] } });
+    const arc = id(G, 'Arc Lightning');
+    const bad = Engine.perform(G, 0, { type: 'cast', id: arc, targets: [{ divide: [{ obj: id(G, 'Grizzly Bears'), n: 2 }] }] });
+    assert.ok(!bad.ok); // 合計が3でない
+    ok(Engine.perform(G, 0, { type: 'cast', id: arc, targets: [{ divide: [{ obj: id(G, 'Grizzly Bears'), n: 2 }, { obj: id(G, 'Llanowar Elves'), n: 1 }] }] }));
+    passBoth(G);
+    assert.equal(G.objects[id(G, 'Grizzly Bears')].zone, 'graveyard');
+    assert.equal(G.objects[id(G, 'Llanowar Elves')].zone, 'graveyard');
+    const F = setup({ p0: { hand: [P('Fire Whip')], bf: [K.bears, L.Mountain, L.Mountain] } });
+    ok(Engine.perform(F, 0, { type: 'cast', id: id(F, 'Fire Whip'), targets: [{ obj: id(F, 'Grizzly Bears') }] }));
+    passBoth(F);
+    const acts = Engine.activations(F, 0, id(F, 'Grizzly Bears'));
+    const ping = acts.find((a) => a.ability.effects[0].type === 'damage');
+    assert.ok(ping?.ok, ping?.reason);
+    ok(Engine.perform(F, 0, { type: 'activate', id: id(F, 'Grizzly Bears'), index: ping.index, targets: [{ player: 1 }] }));
+    passBoth(F);
+    assert.equal(F.players[1].life, 19);
+    const R = setup({ p0: { hand: [P('Rathi Dragon')], bf: [L.Mountain, L.Mountain, L.Mountain, L.Mountain, L.Mountain, L.Mountain] } });
+    ok(Engine.perform(R, 0, { type: 'cast', id: id(R, 'Rathi Dragon') }));
+    passBoth(R); passBoth(R);
+    assert.equal(Engine.needs(R).type, 'sacUnlessOther');
+    ok(Engine.perform(R, 0, { type: 'choose', ids: R.pending.options.slice(0, 2) }));
+    assert.equal(R.objects[id(R, 'Rathi Dragon')].zone, 'battlefield');
+    assert.equal(R.battlefield.filter((x) => R.objects[x].def.name === 'Mountain').length, 4);
+    const X = setup({ p0: { hand: [P('Eradicate')], bf: [L.Swamp, L.Swamp, L.Swamp, L.Swamp] }, p1: { bf: [K.bears], hand: [K.bears], grave: [K.bears] } });
+    ok(Engine.perform(X, 0, { type: 'cast', id: id(X, 'Eradicate'), targets: [{ obj: id(X, 'Grizzly Bears', 'battlefield') }] }));
+    passBoth(X);
+    assert.equal(Object.values(X.objects).filter((o) => o.def.name === 'Grizzly Bears' && o.zone === 'exile').length, 3);
+  };
+  tests['real cards: multiple targets, reveal, global statics'] = () => {
+    const G = setup({ p0: { hand: [P('Panic Attack')], bf: [L.Mountain, L.Mountain, L.Mountain] }, p1: { bf: [K.bears, K.giant] } });
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Panic Attack'), targets: [{ multi: [{ obj: id(G, 'Grizzly Bears') }, { obj: id(G, 'Hill Giant') }] }] }));
+    passBoth(G);
+    assert.ok(Engine.ch(G, id(G, 'Grizzly Bears')).cantBlock && Engine.ch(G, id(G, 'Hill Giant')).cantBlock);
+    const S = setup({ p0: { hand: [P('Sea Drake')], bf: [L.Island, L.Island, L.Island] } });
+    ok(Engine.perform(S, 0, { type: 'cast', id: id(S, 'Sea Drake') }));
+    passBoth(S);
+    assert.equal(Engine.needs(S).type, 'triggerTarget');
+    const lands = S.battlefield.filter((x) => S.objects[x].def.name === 'Island').slice(0, 2);
+    ok(Engine.perform(S, 0, { type: 'target', target: { multi: lands.map((x) => ({ obj: x })) } }));
+    passBoth(S);
+    assert.equal(S.players[0].hand.filter((x) => S.objects[x].def.name === 'Island').length, 2);
+    const M = setup({ p0: { hand: [P('Mulch')], bf: [L.Forest, L.Forest], library: [L.Forest, K.bears, L.Mountain, K.bolt] } });
+    const top = M.players[0].library.slice(0, 4);
+    const landsTop = top.filter((x) => Engine.isType(M, x, 'land')).length;
+    ok(Engine.perform(M, 0, { type: 'cast', id: id(M, 'Mulch') }));
+    passBoth(M);
+    assert.equal(M.players[0].hand.length, landsTop);
+    assert.equal(M.players[0].graveyard.length, 1 + 4 - landsTop); // Mulch + 土地以外
+    const R = setup({ p0: { hand: [L.Island], bf: [P('Root Maze')] } });
+    ok(Engine.perform(R, 0, { type: 'playLand', id: id(R, 'Island', 'hand') }));
+    assert.ok(R.objects[id(R, 'Island', 'battlefield')].tapped);
+    const C = setup({ p0: { bf: [P('Steel Golem')], hand: [K.bears] } });
+    assert.equal(Engine.castInfo(C, 0, id(C, 'Grizzly Bears')).ok, false);
+  };
   tests['oldframe-modern: random decks play to the end'] = () => {
     const games = Number(process.env.GAMES ?? 40);
     const basics = pool.filter((c) => /Basic Land/.test(c.typeLine) && !/Snow/.test(c.typeLine));
@@ -421,6 +522,7 @@ if (pool) {
         }
       }
       if (G.winner != null || G.turn >= 60) finished++;
+      else console.log(`  game ${g} stuck at turn ${G.turn} step ${G.step}:`, G.log.slice(-8).map((e) => e.text).join(' | '));
     }
     console.log(`  ${finished}/${games} games finished`);
     assert.equal(finished, games);

@@ -116,7 +116,7 @@
     '戦闘開始ステップ。': 'Beginning of combat step.', 'クリーンアップ・ステップ。': 'Cleanup step.',
     'ブロックしない（ログ）': 'No blocks', '戦闘ダメージはすべて軽減された': 'All combat damage was prevented', '探したが見つからなかった': 'Searched but found nothing',
     // エンジンの理由
-    'モードを選んでください': 'Choose a mode', '追加のコストで生け贄に捧げるものがありません': 'Nothing to sacrifice for the additional cost',
+    'モードを選んでください': 'Choose a mode', '同じ対象は1回だけ選べます': 'Each target can be chosen only once', '戦闘中にだけ起動できます': 'Activate only during combat', '戦闘終了ステップにだけ起動できます': 'Activate only during the end of combat step', '自分のターンにだけ起動できます': 'Activate only during your turn', '墓地のカードが足りません（スレッショルド）': 'Not enough cards in your graveyard (threshold)', 'クリックで選ぶ（もう一度で取り消し）': 'Click to choose (click again to undo)', '白': 'White', '青': 'Blue', '黒': 'Black', '赤': 'Red', '緑': 'Green', '選んでください': 'Choose one', '追加のコストで生け贄に捧げるものがありません': 'Nothing to sacrifice for the additional cost',
     '追加のコストで捨てるカードがありません': 'No card to discard for the additional cost', 'このターンはもう起動できません': "It can't be activated again this turn",
     'タップできるものがありません': 'Nothing to tap', '自分のアップキープにだけ起動できます': 'Activate only during your upkeep',
     '手札に加えるカードを選んでください': 'Choose a card to put into your hand', '並べる順にカードを選んでください': 'Choose cards in the order to put them',
@@ -238,6 +238,18 @@
   // ---------- 訳語（文の形） ----------
   const PATTERNS = [
     // ルール対戦（追加の処理）
+    [/^「(.+)」：ダメージを割り振ってください（残り(\d+)点）$/, (_, c, n) => `"${c}": divide the damage (${n} left)`],
+    [/^この対象に与えるダメージ（残り (\d+)）$/, (_, n) => `Damage to this target (${n} left)`],
+    [/^ダメージの合計を(\d+)にしてください$/, (_, n) => `The damage must total ${n}`],
+    [/^(.+?)：(.+)と同じ名前のカードをすべて追放した$/, (_, s, c) => `${src(s)}: exiled all cards named ${c}`],
+    [/^(.+)：生け贄に捧げた$/, (_, c) => `${c}: sacrificed`],
+    [/^(.+)：(色|クリーチャー・タイプ)を選んでください。?$/, (_, c, w) => `${c}: choose a ${w === '色' ? 'color' : 'creature type'}`],
+    [/^(.+)：(white|blue|black|red|green|[a-z-]+)を選んだ$/, (_, c, w) => `${c}: chose ${w}`],
+    [/^(.+)のコントロールを得た$/, (_, c) => `Gained control of ${c}`],
+    [/^(.+?)：(.+)のコントロールをこのターン得た$/, (_, s, c) => `${src(s)}: gained control of ${c} until end of turn`],
+    [/^(.+)は(\d+|X)\/(\d+|X)のクリーチャーになった$/, (_, c, a, b) => `${c} became a ${a}/${b} creature`],
+    [/^(.+?)：追加のターンを得た$/, (_, s) => `${src(s)}: takes an extra turn`],
+    [/^(.+)は単独では(攻撃|ブロック)できません$/, (_, c, w) => `${c} can't ${w === '攻撃' ? 'attack' : 'block'} alone`],
     [/^占術：(\d+)枚を一番下へ、(\d+)枚を一番上へ$/, (_, a, b) => `Scry: ${a} to the bottom, ${b} on top`],
     [/^上から(\d+)枚を見て、1枚を手札に加えた$/, (_, n) => `Looked at the top ${cards(n)} and put one into the hand`],
     [/^上から(\d+)枚を並べ替えた$/, (_, n) => `Reordered the top ${cards(n)}`],
