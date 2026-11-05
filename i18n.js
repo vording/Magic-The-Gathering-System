@@ -116,6 +116,17 @@
     '戦闘開始ステップ。': 'Beginning of combat step.', 'クリーンアップ・ステップ。': 'Cleanup step.',
     'ブロックしない（ログ）': 'No blocks', '戦闘ダメージはすべて軽減された': 'All combat damage was prevented', '探したが見つからなかった': 'Searched but found nothing',
     // エンジンの理由
+    'モードを選んでください': 'Choose a mode', '追加のコストで生け贄に捧げるものがありません': 'Nothing to sacrifice for the additional cost',
+    '追加のコストで捨てるカードがありません': 'No card to discard for the additional cost', 'このターンはもう起動できません': "It can't be activated again this turn",
+    'タップできるものがありません': 'Nothing to tap', '自分のアップキープにだけ起動できます': 'Activate only during your upkeep',
+    '手札に加えるカードを選んでください': 'Choose a card to put into your hand', '並べる順にカードを選んでください': 'Choose cards in the order to put them',
+    '手札に戻すものを選んでください': 'Choose what to return to your hand', 'ダメージを軽減した': 'Prevented the damage', '探したが選ばなかった': 'Searched and chose nothing',
+    'ライブラリーから1枚を探して一番上に置いた': 'Searched for a card and put it on top of the library', 'このモードでは唱えられません': "This mode can't be cast",
+    '占術：ライブラリーの一番下に置くカードを選んで「決定」（選ばなかったものは上に残る）。': 'Scry: choose cards to put on the bottom, then "OK" (the rest stay on top).',
+    '手札に加えるカードを1枚選んでください。': 'Choose one card to put into your hand.', 'ライブラリーの一番上から並べる順にカードを選んで「決定」。': 'Choose cards in order from the top, then "OK".',
+    '占術': 'Scry', '並べ替え': 'Reorder', 'ライブラリーの上のカード': 'Top of library', '手札に加えるカードをクリック': 'Click a card to put into your hand',
+    '一番下に置くカードをクリック（もう一度で取り消し）': 'Click cards to put on the bottom (click again to undo)', '一番上に置く順にクリック': 'Click in order from the top',
+    '捨てさせるカードをクリック': 'Click the card to discard', '手札に加えるカードを選んでください。': 'Choose a card to put into your hand.',
     '優先権がありません': "You don't have priority", 'マナが足りません': 'Not enough mana', '手札にありません': 'Not in your hand', '土地は唱えられません': "Lands can't be cast",
     'ソーサリーを唱えられるときだけ起動できます': 'Activate only as a sorcery', 'このターンはもう起動しました': 'Already activated this turn',
     'タップしています': "It's tapped", '召喚酔いです': 'Summoning sick', 'ライフが足りません': 'Not enough life', '捨てるカードがありません': 'No card to discard',
@@ -203,6 +214,7 @@
     let m;
     if ((m = /^X=(\d+)$/.exec(x))) return ` (X=${m[1]})`;
     if (x === 'フラッシュバック') return ' (flashback)';
+    if (x === 'キッカー') return ' (kicked)';
     if ((m = /^対象：(.+)$/.exec(x))) return ` (targeting ${list(m[1])})`;
     if ((m = /^(.+)をタップ$/.exec(x))) return ` (tapped ${list(m[1])})`;
     return ` (${x})`;
@@ -225,6 +237,34 @@
 
   // ---------- 訳語（文の形） ----------
   const PATTERNS = [
+    // ルール対戦（追加の処理）
+    [/^占術：(\d+)枚を一番下へ、(\d+)枚を一番上へ$/, (_, a, b) => `Scry: ${a} to the bottom, ${b} on top`],
+    [/^上から(\d+)枚を見て、1枚を手札に加えた$/, (_, n) => `Looked at the top ${cards(n)} and put one into the hand`],
+    [/^上から(\d+)枚を並べ替えた$/, (_, n) => `Reordered the top ${cards(n)}`],
+    [/^(.+?)：次の(\d+)点のダメージを軽減する$/, (_, s, n) => `${src(s)}: prevent the next ${n} damage`],
+    [/^(.+?)：次に(.+)の発生源から受けるダメージを軽減する$/, (_, s, c) => `${src(s)}: prevent the next damage from a ${c} source`],
+    [/^(.+)を捨てた（無作為）$/, (_, c) => `Discarded ${c} (at random)`],
+    [/^(.+)を捨てた（(.+)）$/, (_, c, r) => `Discarded ${c} (${T(r)})`],
+    [/^手札を公開した：(.+)$/, (_, l) => `Revealed hand: ${list(l)}`],
+    [/^(.+?)：(.+)をライブラリーの一番上へ$/, (_, s, c) => `${src(s)}: put ${c} on top of the library`],
+    [/^(.+)は打ち消されない$/, (_, c) => `${c} can't be countered`],
+    [/^(.+)でマナを出した$/, (_, c) => `Added mana with ${c}`],
+    [/^(.+?)：支払わなかった$/, (_, s) => `${translate(s)}: didn't pay`],
+    [/^(.+?)：(.+)に-1\/-1カウンター$/, (_, s, c) => `${src(s)}: -1/-1 counter on ${c}`],
+    [/^(.+)を唱えられるモードがありません$/, (_, c) => `No mode of ${c} can be cast`],
+    [/^(.+)は(\d+)体までしかブロックできません$/, (_, c, n) => `${c} can't be blocked by more than ${n}`],
+    [/^(.+)は(\d+)体以上でないとブロックできません$/, (_, c, n) => `${c} can only be blocked by ${n} or more creatures`],
+    [/^生け贄に捧げるものを(\d+)つ選んでください$/, (_, n) => `Choose ${n} to sacrifice`],
+    [/^生け贄に捧げるものを(\d+)つ選んでください（(.+)）。$/, (_, n, r) => `Choose ${n} to sacrifice (${T(r)}).`],
+    [/^(.+)：生け贄に捧げるものをクリック（(\d+)\/(\d+)）$/, (_, r, a, b) => `${T(r)}: click what to sacrifice (${a}/${b})`],
+    [/^(.+)：捨てさせるカードを選んでください。?$/, (_, r) => `${T(r)}: choose a card for them to discard`],
+    [/^(.+)の手札$/, (_, p) => `${T(p)}'s hand`],
+    [/^キッカー（(.+)）を支払いますか？$/, (_, m) => `Pay the kicker (${m})?`],
+    [/^生け贄：(.+)$/, (_, c) => `Sacrifice: ${c}`],
+    [/^捨てる：(.+)$/, (_, c) => `Discard: ${c}`],
+    [/^モード(\d+)$/, (_, n) => `Mode ${n}`],
+    [/^(.+)（唱えられません）$/, (_, m) => `${m} (can't be cast)`],
+    [/^(占術|並べ替え)：(\d+)枚選択$/, (_, k, n) => `${k === '占術' ? 'Scry' : 'Reorder'}: ${n} selected`],
     // ルール対戦
     [/^(.+)を唱えた((?:（[^（）]*）)*)$/, (_, c, rest) => `Cast ${c}${castNotes(rest)}`],
     [/^ゲーム開始（(.+)が先手）$/, (_, p) => `Game start (${T(p)} goes first)`],

@@ -199,6 +199,7 @@ const Rules = (() => {
       if (s === 'untapped' && c.tapped) return false;
       if (s === 'attacking' && !c.attacking) return false;
       if (s === 'blocking' && c.block == null && !c.blocking) return false;
+      if (s === 'combat' && !c.attacking && c.block == null && !c.blocking) return false;
     }
     return true;
   }

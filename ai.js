@@ -52,8 +52,9 @@ const AI = (() => {
   // ---------- 対象を選ぶ ----------
 
   // mode: 'main' | 'etb' | 'combat' | 'end' | 'respond'。良い対象がなければ null
-  function chooseTarget(G, p, fx, spec, x, mode, srcId) {
-    const cands = E().targetsFor(G, p, spec, srcId, srcId ? o(G, srcId)?.def.colors ?? [] : []);
+  // colors: 呪文の色（プロテクションの判定に使う。能力なら発生源の色）
+  function chooseTarget(G, p, fx, spec, x, mode, srcId, colors = null) {
+    const cands = E().targetsFor(G, p, spec, srcId, colors ?? (srcId ? o(G, srcId)?.def.colors ?? [] : []));
     if (!cands.length) return null;
     const q = other(p);
     const theirs = cands.filter((t) => t.obj != null && o(G, t.obj).controller === q);
@@ -103,7 +104,18 @@ const AI = (() => {
       case 'lose':
       case 'discard':
       case 'mill':
+      case 'sacrifice':
+      case 'reveal':
+      case 'discardRandom':
         return face ?? null;
+      case 'prevent': {
+        const pick = best(mine.filter(crt));
+        return pick ?? cands.find((t) => t.player === p) ?? null;
+      }
+      case 'exileGrave': return [...cands].filter((t) => t.grave != null && o(G, t.grave).owner === q).sort((a, b) => (o(G, b.grave).def.cmc || 0) - (o(G, a.grave).def.cmc || 0))[0] ?? null;
+      case 'preventBy': return best(theirs.filter((t) => crt(t) && o(G, t.obj).attacking)) ?? null;
+      case 'topdeck': return best(theirs.filter((t) => !isT(G, t.obj, 'land'))) ?? null;
+      case 'tapOrUntap': return best(theirs.filter((t) => !o(G, t.obj).tapped)) ?? (mode === 'etb' ? cands[0] : null);
       case 'counter': {
         const s = cands.map((t) => G.stack.find((x) => x.sid === t.stack)).filter((s) => s && s.controller === q).at(-1);
         return s ? { stack: s.sid } : null;
@@ -153,6 +165,10 @@ const AI = (() => {
       case 'damagePlayers': return !fx.players.includes('me') || G.players[p].life - n > 5 || G.players[q].life <= n;
       case 'pumpAll': return false;
       case 'discard': return G.players[q].hand.length > 0;
+      case 'sacrifice': return fx.target.players.length === 1 && fx.target.players[0] === 'opp';
+      case 'discardHand': return G.players[q].hand.length > G.players[p].hand.length + 1;
+      case 'discardRandom': return G.players[q].hand.length > 0;
+      case 'search': return G.players[p].library.length > 0;
       case 'tapAllOpp': return creatures(G, q).some((id) => !o(G, id).tapped) && G.active === p;
       case 'fog': return false;
       case 'drawEach': return G.players[p].hand.length <= G.players[q].hand.length;
@@ -164,16 +180,47 @@ const AI = (() => {
 
   // → { action, score }（唱えないなら null）
   function castPlan(G, p, id, mode) {
-    const info = E().castInfo(G, p, id);
+    const base = E().castInfo(G, p, id);
+    if (!base.ok) return null;
+    const x = o(G, id);
+    const def = x.def;
+    // モードを選ぶ呪文：唱えられるモードのうち一番よいもの
+    if (base.needMode) {
+      let best = null;
+      def.modes.forEach((_, i) => {
+        if (!base.okModes[i]) return;
+        const plan = castPlanWith(G, p, id, mode, { mode: i });
+        if (plan && (!best || plan.score > best.score)) best = plan;
+      });
+      return best;
+    }
+    // キッカー：払えるなら払う
+    if (base.canKick) {
+      const kicked = castPlanWith(G, p, id, mode, { kicked: true });
+      if (kicked) return kicked;
+    }
+    return castPlanWith(G, p, id, mode, {});
+  }
+
+  function castPlanWith(G, p, id, mode, opts) {
+    const info = E().castInfo(G, p, id, opts);
     if (!info.ok) return null;
     const x = o(G, id);
     const def = x.def;
+    const spellFx = def.modes?.length ? def.modes[opts.mode ?? 0] : def.spell.filter((f) => !f.kicked || opts.kicked);
     if (def.types.includes('planeswalker')) return null;
     const spell = def.types.includes('instant') || def.types.includes('sorcery');
-    if (spell && !def.spell.length) return null;
+    if (spell && !spellFx.length) return null;
     if ((mode === 'combat' || mode === 'end' || mode === 'respond') && !(def.types.includes('instant') || def.keywords.includes('flash'))) return null;
-    if (spell && def.spell.some((f) => f.type === 'fog')) return null; // 霧は戦闘中に別に判断
-    if (spell && def.spell.some((f) => f.type === 'counter') && mode !== 'respond') return null;
+    if (spell && spellFx.some((f) => f.type === 'fog')) return null; // 霧は戦闘中に別に判断
+    if (spell && spellFx.some((f) => f.type === 'counter') && mode !== 'respond') return null;
+    // 追加のコストで生け贄：一番安いものを捧げる（捧げるものがクリーチャー1体だけなら唱えない）
+    let sacrifice = null;
+    if (def.addCost?.sacType) {
+      const opts2 = bfOf(G, p).filter((id2) => isT(G, id2, def.addCost.sacType)).sort((a, b) => value(G, a) - value(G, b));
+      if (!opts2.length || (def.addCost.sacType === 'creature' && value(G, opts2[0]) > 5)) return null;
+      sacrifice = opts2[0];
+    }
     if (def.equip && !creatures(G, p).length) return null;
     const X = info.x ? info.maxX : 0;
     if (info.x && X < 1) return null;
@@ -183,10 +230,10 @@ const AI = (() => {
       if (!t) return null;
       targets.push(t);
     } else if (spell) {
-      for (const fx of def.spell) {
+      for (const fx of spellFx) {
         const spec = E().specOf(fx);
         if (spec) {
-          const t = chooseTarget(G, p, fx, spec, X, mode, null);
+          const t = chooseTarget(G, p, fx, spec, X, mode, null, def.colors);
           if (!t) return null;
           targets.push(t);
         } else {
@@ -197,7 +244,7 @@ const AI = (() => {
     }
     const total = (def.cmc || 0) + X;
     const score = total * 10 + (def.types.includes('creature') ? 5 : 0) + (spell ? 3 : 0);
-    return { action: { type: 'cast', id, targets, x: X, flashback: x.zone === 'graveyard' }, score };
+    return { action: { type: 'cast', id, targets, x: X, flashback: x.zone === 'graveyard', mode: opts.mode ?? null, kicked: !!opts.kicked, sacrifice }, score: score + (opts.kicked ? 5 : 0) };
   }
 
   function bestCast(G, p, mode) {
@@ -286,8 +333,10 @@ const AI = (() => {
     const blocks = {};
     const used = new Set();
     const unblocked = [];
+    // 威迫・「N体以上でないとブロックできない」は1体ではブロックしない
+    const needMany = (a) => E().ch(G, a).kw.has('menace') || (E().ch(G, a).minBlockers ?? 1) > 1;
     for (const a of attackers) {
-      if (E().ch(G, a).kw.has('menace')) { unblocked.push(a); continue; }
+      if (needMany(a)) { unblocked.push(a); continue; }
       let best = null;
       let bestScore = -Infinity;
       for (const b of avail) {
@@ -304,7 +353,7 @@ const AI = (() => {
     let incoming = unblocked.reduce((s, a) => s + Math.max(0, E().ch(G, a).p), 0);
     for (const a of unblocked) {
       if (incoming < G.players[p].life) break;
-      if (E().ch(G, a).kw.has('menace')) continue;
+      if (needMany(a)) continue;
       const b = avail.filter((x) => !used.has(x) && E().canBlock(G, x, a)).sort((x, y) => value(G, x) - value(G, y))[0];
       if (b == null) continue;
       blocks[b] = a;
@@ -424,6 +473,8 @@ const AI = (() => {
   }
 
   function chooseSearch(G, p, options) {
+    // 土地以外を探すとき：重いもの・クリーチャーを優先
+    if (!options.every((id) => isT(G, id, 'land'))) return [...options].sort((a, b) => (o(G, b).def.cmc || 0) - (o(G, a).def.cmc || 0))[0];
     const have = new Set(bfOf(G, p).flatMap((id) => o(G, id).def.activated.filter((a) => a.mana).flatMap((a) => a.mana.choices ?? a.mana.fixed ?? [])));
     const need = new Set(G.players[p].hand.flatMap((id) => o(G, id).def.colors));
     const pick = options.find((id) => o(G, id).def.activated.some((a) => a.mana && (a.mana.choices ?? []).some((c) => need.has(c) && !have.has(c))));
@@ -468,6 +519,21 @@ const AI = (() => {
       }
       case 'discard': return { type: 'choose', ids: chooseDiscard(G, p, pend.n, pend.options) };
       case 'search': return { type: 'choose', ids: [chooseSearch(G, p, pend.options)] };
+      case 'returnOwn': return { type: 'choose', ids: [[...pend.options].sort((a, b) => value(G, a) - value(G, b))[0]] };
+      case 'sacrifice': return { type: 'choose', ids: [...pend.options].sort((a, b) => value(G, a) - value(G, b)).slice(0, pend.n) };
+      case 'scry': {
+        // 土地が足りていれば土地を下へ、足りなければ重い呪文を下へ
+        const lands = bfOf(G, p).filter((id) => isT(G, id, 'land')).length;
+        return { type: 'choose', ids: pend.options.filter((id) => (isT(G, id, 'land') ? lands >= 6 : (o(G, id).def.cmc || 0) > lands + 2)) };
+      }
+      case 'lookPick': {
+        const lands = bfOf(G, p).filter((id) => isT(G, id, 'land')).length;
+        const pick = [...pend.options].sort((x, y) => score(y) - score(x))[0];
+        function score(id) { return isT(G, id, 'land') ? (lands < 4 ? 10 : 1) : (o(G, id).def.cmc || 0) <= lands + 1 ? 5 + (o(G, id).def.cmc || 0) : 2; }
+        return { type: 'choose', ids: [pick] };
+      }
+      case 'reorder': return { type: 'choose', ids: [...pend.options] };
+      case 'chooseHand': return { type: 'choose', ids: [[...pend.options].sort((a, b) => (o(G, b).def.cmc || 0) - (o(G, a).def.cmc || 0))[0]] };
       case 'payOrNot': {
         if (!pend.canPay) return { type: 'pay', yes: false };
         // エコー：小さいクリーチャーのために重いマナを払わない
