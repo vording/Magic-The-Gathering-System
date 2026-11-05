@@ -52,6 +52,11 @@
     '空欄ならリスト内の名前か「インポート」': 'If empty, the name in the list or "Import"',
     'カードの行が見つかりませんでした。「4 Lightning Bolt」「4 稲妻」のように1行に1種類書いてください。': 'No card lines found. Write one card per line, like "4 Lightning Bolt" or "4 稲妻".',
     'Scryfall に接続できません。短時間に検索しすぎた場合は1分ほど待ってから再度お試しください': 'Cannot connect to Scryfall. If you searched too often, wait about a minute and try again.',
+    '絞り込み': 'Filters', '絞り込みをリセット': 'Reset all filters', '色': 'Color', 'タイプ': 'Type', 'マナ総量': 'Mana value', 'レアリティ': 'Rarity',
+    'すべて': 'All', '7以上': '7+', 'コモン': 'Common', 'アンコモン': 'Uncommon', 'レア': 'Rare', '神話レア': 'Mythic',
+    '無色': 'Colorless', '多色': 'Multicolor',
+    'カード一覧': 'Cards', '並び順': 'Sort', '発売日': 'Release date', '人気': 'Popularity', 'デッキ一覧': 'Decks & Lists',
+    'ルール対戦 ▶': 'Rules match ▶',
     'カード検索 ': 'Card Search ', 'デッキ（': 'Deck (', '枚）': ' cards)', '枚': 'cards',
     // 一人回し・対戦：画面
     'ランダムな名前': 'Random name',
@@ -240,6 +245,7 @@
     // ルール対戦（追加の処理）
     [/^使えるマナ (\d+)$/, (_, n) => `Mana available ${n}`],
     [/^(\d+)枚タップ$/, (_, n) => `taps ${n}`],
+    [/^(.+)・(\d+)枚$/, (_, f, n) => `${T(f)} · ${n} cards`],
     [/^(.+)(が唱えた|の誘発型能力|が能力を起動)$/, (_, w, v) => `${T(w)} ${v === 'が唱えた' ? 'cast' : v === 'の誘発型能力' ? "— triggered ability" : 'activated an ability'}`],
     [/^対象：(.+)$/, (_, l) => `Target: ${list(l)}`],
     [/^(\d+)つ選んでください$/, (_, n) => `Choose ${n}`],

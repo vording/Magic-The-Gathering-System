@@ -15,7 +15,6 @@
   gap: 6px;
   padding: 6px;
 }
-@container (max-width: 900px) { .layout { grid-template-columns: 1fr; grid-template-rows: none; overflow: auto; } }
 
 .footer { padding: 2px 10px 6px; color: #9c9c9c; font-size: 12px; }
 
@@ -47,7 +46,7 @@
   box-shadow: none;
   text-align: left;
 }
-.result img { width: 100%; display: block; border-radius: 4.75% / 3.5%; }
+.result img { width: 100%; aspect-ratio: 488 / 680; object-fit: cover; display: block; border-radius: 4.75% / 3.5%; }
 .result:hover img { outline: 1px solid #fff; outline-offset: 1px; }
 .result .noimg {
   aspect-ratio: 488 / 680;
@@ -199,11 +198,180 @@ html.phone .import-dialog textarea { font-size: 16px; min-height: 180px; }
 html.phone .io-actions button { padding: 0 2px; font-size: 13px; white-space: nowrap; }
 html.phone #export-text { font-size: 16px; }
 
-/* ---------- PC：画面いっぱい ----------
-   検索結果のカードは画面の高さに合わせた大きさで並べ、カードの拡大は縦に伸びすぎないようにする */
-html:not(.phone) .layout { grid-template-columns: minmax(0, 1fr) clamp(320px, 24cqw, 460px); gap: clamp(6px, .5cqw, 10px); padding: clamp(6px, .5cqw, 10px); }
-html:not(.phone) .results { grid-template-columns: repeat(auto-fill, minmax(clamp(120px, 15cqh, 210px), 1fr)); }
-html:not(.phone) .preview-frame { width: min(100%, calc(34cqh / 1.395)); align-self: center; margin-left: auto; margin-right: auto; }
-html:not(.phone) .search-panel, html:not(.phone) .deck-panel { background-image: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(0, 0, 0, .1)); }
+/* ==========================================================
+   PC：カード管理ソフトのような配置
+   左上：絞り込み　中央上：カード一覧　左下：デッキ一覧　中央下：デッキの中身
+   右：カードの拡大・マナカーブ・対戦ボタン
+   ========================================================== */
+html:not(.phone) .layout {
+  grid-template-columns: clamp(200px, 13.5cqw, 280px) minmax(0, 1fr) clamp(250px, 17cqw, 360px);
+  grid-template-rows: minmax(0, 1fr) clamp(210px, 33cqh, 430px);
+  grid-template-areas: "filter search side" "decks deck side";
+  gap: clamp(5px, .45cqw, 9px);
+  padding: clamp(5px, .45cqw, 9px);
+}
+html:not(.phone) .filter-panel { grid-area: filter; }
+html:not(.phone) .search-panel { grid-area: search; }
+html:not(.phone) .decks-panel { grid-area: decks; }
+html:not(.phone) .deck-panel { grid-area: deck; }
+html:not(.phone) .side-panel { grid-area: side; }
+html:not(.phone) .layout > .panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(0, 0, 0, .1));
+}
+html:not(.phone) .layout > .panel > .panel-body { flex: 1; min-height: 0; overflow: auto; }
+html:not(.phone) .format-select { display: none; }
+html:not(.phone) .footer { display: none; }
+html:not(.phone) .bottombar { display: none; }
+
+/* 上のバーの画面切り替え */
+.top-tabs { display: none; }
+html:not(.phone) .top-tabs { display: flex; align-self: stretch; gap: 2px; margin-left: 18px; }
+.top-tabs a, .top-tabs span {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font: 700 15px var(--font-heading);
+  letter-spacing: .05em;
+  color: #cfcfcf;
+  text-decoration: none;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
+  background: linear-gradient(#4a4a4a, #333);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .1);
+}
+.top-tabs a:hover { color: #fff; background: linear-gradient(#5a5a5a, #3c3c3c); }
+.top-tabs .active { color: #fff; background: linear-gradient(#6a6a6a, #474747); box-shadow: inset 0 -2px #e8c66a, inset 0 1px rgba(255, 255, 255, .15); }
+
+/* ---------- 絞り込み ---------- */
+.filter-body { display: flex; flex-direction: column; gap: 8px; }
+.filter-body .search-form { flex-direction: column; }
+.filter-body .search-form input { width: 100%; }
+.filter-reset { align-self: flex-end; padding: 1px 8px; font-size: 12px; }
+.filter-group { display: flex; flex-direction: column; gap: 3px; }
+.filter-group select { width: 100%; }
+.filter-title {
+  margin: 0;
+  padding: 2px 8px;
+  font-size: 13px;
+  color: #e6e6e6;
+  background: linear-gradient(#4f4f4f, #3e3e3e);
+  border: 1px solid #000;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .08);
+}
+.format-radios { display: flex; flex-direction: column; padding: 4px 6px; background: #2d2d2d; box-shadow: var(--sunken); }
+.format-radio { display: flex; align-items: center; gap: 4px; padding: 1px 0; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.format-radio.custom:first-of-type, .format-radio:not(.custom) + .format-radio.custom { margin-top: 4px; padding-top: 5px; border-top: 1px solid #444; }
+.color-filter { display: flex; flex-wrap: wrap; gap: 4px; }
+.mana-pip, .mana-pip:hover:not(:disabled), .mana-pip:active:not(:disabled) {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font: bold 12px/24px Arial, sans-serif;
+  text-align: center;
+  color: #111;
+  border: 1px solid #000;
+  border-radius: 50%;
+  opacity: .45;
+  box-shadow: inset 0 -2px rgba(0, 0, 0, .25);
+}
+.mana-pip[aria-pressed="true"] { opacity: 1; box-shadow: 0 0 0 2px #e8c66a, inset 0 -2px rgba(0, 0, 0, .25); }
+.pip-w { background: #f8f4dc; } .pip-u { background: #9cc9ef; } .pip-b { background: #a99fa0; }
+.pip-r { background: #f09477; } .pip-g { background: #9bd3ae; } .pip-c { background: #cfc9c6; }
+.pip-m { background: linear-gradient(135deg, #f8f4dc, #9cc9ef, #a99fa0, #f09477, #9bd3ae); }
+
+/* ---------- カード一覧の上のツールバー ---------- */
+.toolbar { display: flex; align-items: center; gap: 10px; height: auto; min-height: 25px; padding-top: 2px; padding-bottom: 2px; flex-wrap: wrap; }
+.toolbar-title { margin: 0; font: inherit; }
+.toolbar .status { margin: 0; font-family: var(--font-ui, inherit); font-weight: normal; letter-spacing: 0; font-size: 12px; }
+.toolbar .tool-field, .toolbar .toggle { font-family: var(--font-ui, inherit); font-weight: normal; letter-spacing: 0; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.toolbar select { padding-top: 0; padding-bottom: 0; }
+html:not(.phone) .search-body { padding: 0; }
+html:not(.phone) .results { border: none; grid-template-columns: repeat(auto-fill, minmax(clamp(110px, 11.5cqh, 190px), 1fr)); }
 html:not(.phone) .result img, html:not(.phone) .result .noimg { transition: transform .12s ease-out; }
 html:not(.phone) .result:hover img { transform: translateY(-3px); }
+html:not(.phone) .more { margin: 0; flex: none; }
+
+/* ---------- デッキ一覧 ---------- */
+html:not(.phone) #deck-select { display: none; }
+.deck-list { display: none; }
+html:not(.phone) .decks-body { display: flex; flex-direction: column; gap: 6px; }
+html:not(.phone) .deck-list { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 2px; list-style: none; background: #2d2d2d; box-shadow: var(--sunken); }
+.deck-item, .deck-item:hover:not(:disabled), .deck-item:active:not(:disabled) {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  text-align: left;
+  color: var(--ink);
+  background: linear-gradient(#444, #383838);
+  border: 1px solid #000;
+  border-radius: 0;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .06);
+}
+.deck-item:hover:not(:disabled) { background: linear-gradient(#505050, #424242); }
+.deck-item.current { color: #fff; background: linear-gradient(#5f5f5f, #4a4a4a); box-shadow: inset 3px 0 #e8c66a; }
+.deck-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
+.deck-item-info { flex: none; font-size: 11px; color: var(--muted); }
+html:not(.phone) .decks-body .deck-actions button { flex: 1; padding: 2px 4px; font-size: 12px; }
+
+/* ---------- デッキの中身：種類ごとに段組み ---------- */
+.deck-head { display: flex; align-items: center; gap: 8px; }
+.deck-head > span:first-child { flex: 1; }
+.deck-head-actions { display: flex; gap: 4px; font-family: var(--font-ui, inherit); font-weight: normal; letter-spacing: 0; }
+.deck-head-actions button { padding: 0 8px; font-size: 12px; line-height: 19px; }
+html:not(.phone) .deck-body { padding: 0; }
+html:not(.phone) .deck { max-height: none; height: 100%; overflow: auto; columns: clamp(200px, 16cqw, 280px); column-gap: 8px; column-rule: 1px solid #000; padding: 4px; }
+html:not(.phone) .deck h3 { break-after: avoid; margin-top: 4px; }
+html:not(.phone) .deck .row { break-inside: avoid; }
+
+/* ---------- 右：カードの拡大など ---------- */
+.side-panel .preview-frame { margin: 6px; }
+html:not(.phone) .side-panel .preview-frame { flex: none; width: min(calc(100% - 12px), calc(46cqh / 1.395)); align-self: center; }
+html:not(.phone) .side-body { display: flex; flex-direction: column; gap: 6px; }
+html:not(.phone) .side-body .warnings { margin: 0; }
+html:not(.phone) .side-body .section-title { margin: 0; }
+html:not(.phone) .side-body .play-btn { min-height: clamp(30px, 4cqh, 42px); font-size: clamp(13px, 1.4cqh, 16px); }
+html:not(.phone) .side-body .play-btn:first-of-type { margin-top: auto; }
+
+/* ---------- スマホ：タブで切り替え（検索タブ：絞り込み＋一覧、デッキタブ：デッキ） ---------- */
+html.phone .layout { display: flex; flex-direction: column; overflow: auto; }
+html.phone body:not([data-tab="deck"]) .decks-panel,
+html.phone body:not([data-tab="deck"]) .side-panel { display: none; }
+html.phone body[data-tab="deck"] .filter-panel { display: none; }
+html.phone .search-panel { flex: 1; min-height: 60vh; display: flex; flex-direction: column; }
+html.phone .search-body { flex: 1; min-height: 0; }
+html.phone .filter-panel { flex: none; }
+html.phone .filter-panel .panel-head { display: none; }
+html.phone .filter-body { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+html.phone .filter-body .search-form { flex: 1 1 100%; flex-direction: row; }
+html.phone .filter-group { flex: 1 1 30%; }
+html.phone .filter-group:has(.format-radios) { display: none; }
+html.phone .filter-group:has(.color-filter) { flex: 1 1 100%; }
+html.phone .filter-title { display: none; }
+html.phone .mana-pip { width: 32px; height: 32px; line-height: 30px; }
+html.phone .filter-reset { order: 9; }
+
+html.phone .deck-head-actions { flex-wrap: wrap; }
+html.phone .side-panel .preview-frame { display: none; }
+html.phone .side-body { display: flex; flex-direction: column; gap: 6px; }
+html:not(.phone) .decks-body .deck-actions { display: grid; grid-template-columns: 1fr 1fr; }
+html:not(.phone) .decks-body .deck-actions button { white-space: nowrap; }
+/* 高さの低い画面：絞り込みの間を詰める */
+@container (max-height: 900px) {
+  html:not(.phone) .format-radio { font-size: 12px; padding: 0; }
+  html:not(.phone) .filter-body { gap: 5px; }
+}
+/* スマホ：デッキの見出しのボタンは下の行に */
+html.phone .deck-head { flex-wrap: wrap; height: auto; }
+html.phone .deck-head-actions { flex: 1 1 100%; }
+html.phone .deck-head-actions button { flex: 1; min-height: 30px; padding: 0 4px; font-size: 12px; }
+/* 画像の読み込み前でもカードの大きさで並べる */
+.results { grid-auto-rows: max-content; }
+.results .result { display: block; width: 100%; }
+html:not(.phone) .mana-pip, html:not(.phone) .mana-pip:hover:not(:disabled), html:not(.phone) .mana-pip:active:not(:disabled) { width: 22px; height: 22px; line-height: 20px; font-size: 11px; }
+html:not(.phone) .color-filter { gap: 3px; flex-wrap: nowrap; }

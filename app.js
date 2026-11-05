@@ -420,7 +420,7 @@ async function fetchOnce(url) {
 function searchUrl(q, { ja = false, oldestFirst = false, prints = false, prefer = true } = {}) {
   // 初版の絵柄: 各カードの最も古い印刷を代表として返させる
   if (state.oldest && prefer) q += ' prefer:oldest';
-  const params = new URLSearchParams({ q, order: oldestFirst ? 'released' : 'name' });
+  const params = new URLSearchParams({ q, order: oldestFirst ? 'released' : sortOrder() });
   if (oldestFirst) params.set('dir', 'asc');
   if (ja) params.set('include_multilingual', 'true');
   if (prints) params.set('unique', 'prints');
@@ -458,9 +458,37 @@ async function legalOracleIds(fmt, cards) {
 
 // ---------- 検索 ----------
 
+// 絞り込み（色・タイプ・マナ総量・レアリティ）と並び順。デッキをまたいで保存する
+const filters = () => (state.filters ??= { colors: [], type: '', mv: '', rarity: '' });
+const sortOrder = () => state.sort ?? 'name';
+function filterQuery() {
+  const f = filters();
+  const parts = [];
+  if (f.colors.length) parts.push(`(${f.colors.map((c) => `c:${c}`).join(' or ')})`);
+  if (f.type) parts.push(`t:${f.type}`);
+  if (f.mv) parts.push(f.mv === '7+' ? 'mv>=7' : `mv=${f.mv}`);
+  if (f.rarity) parts.push(`r:${f.rarity}`);
+  return parts.join(' ');
+}
+
+function renderFilters() {
+  const f = filters();
+  for (const b of document.querySelectorAll('#color-filter [data-color]')) b.setAttribute('aria-pressed', String(f.colors.includes(b.dataset.color)));
+  $('filter-type').value = f.type;
+  $('filter-mv').value = f.mv;
+  $('filter-rarity').value = f.rarity;
+  $('sort').value = sortOrder();
+}
+
+function onFiltersChanged() {
+  saveState();
+  renderFilters();
+  startSearch();
+}
+
 async function startSearch() {
-  const input = $('query').value.trim();
-  if (!input) return;
+  const text = $('query').value.trim();
+  const input = [text, filterQuery()].filter(Boolean).join(' ');
   const fmt = currentFormat();
   const ja = /[぀-ヿ一-鿿]/.test(input);
   const id = ++searchId;
@@ -469,7 +497,7 @@ async function startSearch() {
   $('search-status').textContent = '検索中…';
   try {
     if (ja && fmt.pool) await searchJapaneseInPool(id, input, fmt);
-    else await loadPage(id, searchUrl(`${input} ${formatQuery(fmt)}${ja ? ' lang:ja' : ''}`, { ja }));
+    else await loadPage(id, searchUrl(`${input} ${formatQuery(fmt)}${ja ? ' lang:ja' : ''}`.trim() || 'legal:vintage', { ja }));
   } catch (err) {
     if (id === searchId) $('search-status').textContent = `エラー: ${err.message}`;
   }
@@ -882,6 +910,11 @@ function renderResults() {
       btn.append(badge);
     }
     btn.addEventListener('click', () => addCard(card));
+    btn.addEventListener('mouseenter', () => {
+      if (!image) return;
+      $('preview').src = image;
+      $('preview').hidden = false;
+    });
     btn.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       // スマホの長押しは拡大表示（減らすのは拡大表示のボタンから）
@@ -903,6 +936,22 @@ function renderDeckList() {
   }));
   $('deck-select').value = activeDeck().id;
   $('format').value = activeDeck().format;
+  for (const r of document.querySelectorAll('#format-radios input')) r.checked = r.value === activeDeck().format;
+  // PC：デッキ一覧（クリックで切り替え）
+  $('deck-list').replaceChildren(...state.decks.map((d) => {
+    const fmt = FORMATS.find((f) => f.id === d.format);
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'deck-item' + (d.id === activeDeck().id ? ' current' : '');
+    b.innerHTML = '<span class="deck-item-name"></span><span class="deck-item-info"></span>';
+    b.querySelector('.deck-item-name').textContent = d.name;
+    b.querySelector('.deck-item-info').textContent = `${fmt.name}・${deckTotal(d)}枚`;
+    b.addEventListener('click', () => { if (d.id !== activeDeck().id) switchDeck(d.id); });
+    b.addEventListener('dblclick', renameDeck);
+    li.append(b);
+    return li;
+  }));
 }
 
 function renderDeck() {
@@ -992,8 +1041,7 @@ function renderCurve() {
 function onFormatChanged() {
   renderDeck();
   validateDeck();
-  if ($('query').value.trim()) startSearch();
-  else renderResults();
+  startSearch();
 }
 
 function init() {
@@ -1004,6 +1052,39 @@ function init() {
   custom.label = '非公式フォーマット';
   for (const f of FORMATS) (f.pool ? custom : official).append(new Option(f.name, f.id));
   select.replaceChildren(official, custom);
+  // 絞り込み欄のフォーマット（選ぶと上の選択と同じ動き）
+  $('format-radios').replaceChildren(...FORMATS.map((f) => {
+    const label = document.createElement('label');
+    label.className = 'format-radio' + (f.pool ? ' custom' : '');
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'format-radio';
+    input.value = f.id;
+    input.addEventListener('change', () => {
+      select.value = f.id;
+      select.dispatchEvent(new Event('change'));
+    });
+    label.append(input, ` ${f.name}`);
+    return label;
+  }));
+  for (const b of document.querySelectorAll('#color-filter [data-color]')) {
+    b.addEventListener('click', () => {
+      const f = filters();
+      const c = b.dataset.color;
+      f.colors = f.colors.includes(c) ? f.colors.filter((x) => x !== c) : [...f.colors, c];
+      onFiltersChanged();
+    });
+  }
+  for (const [id, key] of [['filter-type', 'type'], ['filter-mv', 'mv'], ['filter-rarity', 'rarity']]) {
+    $(id).addEventListener('change', (e) => { filters()[key] = e.target.value; onFiltersChanged(); });
+  }
+  $('sort').addEventListener('change', (e) => { state.sort = e.target.value; onFiltersChanged(); });
+  $('filter-reset').addEventListener('click', () => {
+    state.filters = { colors: [], type: '', mv: '', rarity: '' };
+    $('query').value = '';
+    onFiltersChanged();
+  });
+  renderFilters();
   select.addEventListener('change', () => {
     activeDeck().format = select.value;
     saveState();
@@ -1039,8 +1120,7 @@ function init() {
     jaCache.clear();
     jaChecked.clear();
     saveState();
-    if ($('query').value.trim()) startSearch();
-    else renderResults();
+    startSearch();
     renderDeck();
     refreshArt(allDeckCards());
   });
@@ -1088,6 +1168,7 @@ function init() {
 
   renderDeck();
   validateDeck();
+  startSearch();
   localize(deckEntries().map((e) => e.card));
   refreshArt(allDeckCards());
   fillCardInfo();

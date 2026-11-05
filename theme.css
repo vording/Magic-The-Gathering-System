@@ -299,7 +299,7 @@ html.phone .logo-img { height: 24px; }
 html.phone .lang-btn, html.phone .lang-btn:hover:not(:disabled), html.phone .lang-btn:active:not(:disabled) { width: 22px; height: 22px; min-height: 0; padding: 0; }
 
 /* ---------- 項目名（見出し）だけ明朝体 ---------- */
-:root { --font-heading: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", "Noto Serif CJK JP", "MS PMincho", Georgia, "Times New Roman", serif; }
+:root { --font-ui: "MS UI Gothic", Tahoma, Verdana, "Meiryo UI", "Meiryo", "Hiragino Sans", sans-serif; --font-heading: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", "Noto Serif CJK JP", "MS PMincho", Georgia, "Times New Roman", serif; }
 .panel-head, .section-title, .deck h3, .zone-label, .stack-label, .order legend, .opp-status, .player-name, .phase-turn {
   font-family: var(--font-heading);
   font-weight: 700;
