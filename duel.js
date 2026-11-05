@@ -49,6 +49,104 @@ const ui = {
 let timer = null;
 let shownResult = null;
 
+// ---------- 何が起きたかを画面に出す ----------
+// スタックに積まれた呪文・能力・誘発は画面の中央に大きく出す（相手のものは長めに）。
+// ダメージ・破壊・打ち消しなどの出来事は、画面の上に数秒ずつ出す。CPU はこの表示が終わるまで次の行動を待つ。
+
+const ANNOUNCE_MS = { opp: 1900, me: 1000 };
+const TICKER_MS = 4500;
+let announceQueue = []; // [{ sid, ... }]
+let announceUntil = 0; // 今の表示が終わる時刻
+let announceTimer = null;
+let seenSids = null; // 表示済みのスタックの sid
+let seenLog = null; // 表示済みのログの数（ログ全体の長さで数える）
+const tickerItems = [];
+
+// 今の表示が終わるまでの残り時間（ms）
+const announceBusy = () => Math.max(0, announceUntil - Date.now()) + announceQueue.reduce((s, a) => s + a.ms, 0);
+
+function noticeChanges() {
+  if (!G) return;
+  // 新しくスタックに積まれたもの
+  if (seenSids == null) seenSids = new Set(G.stack.map((s) => s.sid));
+  for (const s of G.stack) {
+    if (seenSids.has(s.sid)) continue;
+    seenSids.add(s.sid);
+    announceQueue.push({ ...announceOf(s), ms: s.controller === ME ? ANNOUNCE_MS.me : ANNOUNCE_MS.opp });
+  }
+  // 新しいログ：主な出来事だけ
+  const total = G.logTotal ?? G.log.length;
+  if (seenLog == null) seenLog = total;
+  const fresh = Math.min(total - seenLog, G.log.length);
+  if (fresh > 0) {
+    for (const e of G.log.slice(-fresh)) if (importantLog(e.text)) pushTicker(e);
+  }
+  seenLog = total;
+  showNextAnnounce();
+}
+
+function announceOf(s) {
+  const src = G.objects[s.objId ?? s.source];
+  const who = s.controller === ME ? 'あなた' : G.players[s.controller].name;
+  const verb = s.kind === 'spell' ? 'が唱えた' : s.kind === 'trigger' ? 'の誘発型能力' : 'が能力を起動';
+  const targets = s.targets.filter(Boolean).flatMap((t) => t.multi ?? t.divide ?? [t]).map((t) => (t.player != null ? (t.player === ME ? 'あなた' : G.players[t.player].name)
+    : t.obj != null ? G.objects[t.obj]?.card.name : t.stack != null ? G.stack.find((x) => x.sid === t.stack)?.name : G.objects[t.grave]?.card.name)).filter(Boolean);
+  return { who, verb, name: s.name, image: src?.card.image ?? null, text: s.kind === 'spell' ? (src?.card.text ?? '') : (s.text ?? ''), targets, mine: s.controller === ME };
+}
+
+function showNextAnnounce() {
+  if (Date.now() < announceUntil || !announceQueue.length) return;
+  const a = announceQueue.shift();
+  const box = $('announce');
+  box.replaceChildren();
+  box.classList.toggle('mine', a.mine);
+  if (a.image) box.append(Object.assign(document.createElement('img'), { src: a.image, alt: a.name }));
+  const cap = Object.assign(document.createElement('div'), { className: 'announce-text' });
+  cap.append(Object.assign(document.createElement('div'), { className: 'announce-who', textContent: `${a.who}${a.verb}` }));
+  cap.append(Object.assign(document.createElement('div'), { className: 'announce-name', textContent: a.name }));
+  if (a.targets.length) cap.append(Object.assign(document.createElement('div'), { className: 'announce-targets', textContent: `対象：${a.targets.join('、')}` }));
+  if (!a.image && a.text) cap.append(Object.assign(document.createElement('div'), { className: 'announce-body', textContent: a.text.replace(/\bthis\b/g, '〜') }));
+  box.append(cap);
+  box.hidden = false;
+  box.classList.remove('show');
+  void box.offsetWidth;
+  box.classList.add('show');
+  announceUntil = Date.now() + a.ms;
+  clearTimeout(announceTimer);
+  announceTimer = setTimeout(() => {
+    if (!announceQueue.length) box.hidden = true;
+    announceUntil = 0;
+    showNextAnnounce();
+  }, a.ms);
+}
+
+// クリックで今の表示を閉じる
+function skipAnnounce() {
+  clearTimeout(announceTimer);
+  announceUntil = 0;
+  $('announce').hidden = true;
+  showNextAnnounce();
+  if (G) tick();
+}
+
+const IMPORTANT = /ダメージ|破壊|打ち消され|追放|手札に戻し|ライフを得た|ライフを失った|生け贄|を捨てた|コントロール|ライブラリーから|戦場に出た|トークン|再生した|コピー|束を手札|攻撃しない|で攻撃|ブロック|敗北/;
+const importantLog = (t) => IMPORTANT.test(t) && !/^ライフ -?\d+$/.test(t);
+
+function pushTicker(e) {
+  const who = e.p == null ? '' : e.p === ME ? 'あなた' : G.players[e.p].name;
+  const item = { text: who ? `${who}：${e.text}` : e.text, mine: e.p === ME, until: Date.now() + TICKER_MS };
+  tickerItems.push(item);
+  while (tickerItems.length > 4) tickerItems.shift();
+  renderTicker();
+  setTimeout(renderTicker, TICKER_MS + 50);
+}
+
+function renderTicker() {
+  const now = Date.now();
+  for (let i = tickerItems.length - 1; i >= 0; i--) if (tickerItems[i].until <= now) tickerItems.splice(i, 1);
+  $('ticker').replaceChildren(...tickerItems.map((it) => Object.assign(document.createElement('div'), { className: `ticker-item ${it.mine ? 'mine' : 'theirs'}`, textContent: it.text })));
+}
+
 function load() {
   try { return JSON.parse(sessionStorage.getItem(DUEL_KEY)); } catch { return null; }
 }
@@ -135,14 +233,16 @@ function tick() {
   if (!G || G.winner != null) return;
   const n = Engine.needs(G);
   if (!n) return;
+  // 呪文などの表示が終わるまで、次の行動（CPU・自動のパス）を待つ
+  const wait = announceBusy();
   if (n.player !== ME) {
     if (online()) return; // 相手の操作を待つ
-    const delay = n.type === 'priority' && !G.stack.length ? 220 : 650;
-    timer = setTimeout(() => act(n.player, opponentDecide(n)), delay);
+    const delay = n.type === 'priority' && !G.stack.length ? 260 : 700;
+    timer = setTimeout(() => act(n.player, opponentDecide(n)), delay + wait);
     return;
   }
   if (n.type === 'priority' && !ui.targeting && !awaiting && !shouldStop()) {
-    timer = setTimeout(() => act(ME, { type: 'pass' }), 160);
+    timer = setTimeout(() => act(ME, { type: 'pass' }), 160 + wait);
   }
 }
 
@@ -378,7 +478,10 @@ function onPermanentClick(id, e) {
     return;
   }
   if (o.controller !== ME) return phone() ? showDetail(id) : null;
-  const acts = Engine.activations(G, ME, id).filter((a) => !a.cycling);
+  // マナ能力はクリックでは起動しない（呪文を唱えるときに自動で支払う。手で出すなら右クリック）
+  const isLand = o.def.types.includes('land');
+  const acts = Engine.activations(G, ME, id).filter((a) => !a.cycling && !(a.mana || a.ability?.manaLike));
+  if (isLand && !acts.length) return toast('マナは呪文を唱えるときに自動で支払われます（手でマナを出すときは右クリック）');
   const usable = acts.filter((a) => a.ok);
   if (!acts.length) return phone() ? showDetail(id) : null;
   if (usable.length === 1 && !phone()) return startActivate(id, usable[0].index);
@@ -424,9 +527,19 @@ function detailText(id) {
 
 // ---------- 描画 ----------
 
+// PC ではフェイズの一覧を戦場と手札の間の横長のバーに、スマホでは左列（下のバー）に置く
+function placePhases() {
+  const ph = $('phases');
+  const want = phone() ? $('col-left') : document.querySelector('.board');
+  if (ph.parentElement === want) return;
+  if (phone()) want.insertBefore(ph, want.querySelector('.phase-actions'));
+  else want.insertBefore(ph, want.querySelector('.hand-area'));
+}
+
 function render() {
   renderWaiting();
   if (!G) return;
+  noticeChanges();
   const n = Engine.needs(G);
   const me = G.players[ME];
   const opp = G.players[OPP];
@@ -434,7 +547,10 @@ function render() {
   $('turn-label').textContent = G.turn ? `ターン ${G.turn}（${G.active === ME ? 'あなた' : opp.name}）` : '初手';
   $('land-count').textContent = G.turn && G.active === ME ? `土地 ${me.landsPlayed}/1` : '';
   $('phase-hint').textContent = hintText(n);
-  $('phases').replaceChildren(...Engine.STEPS.map((s) => {
+  const turnTag = document.createElement('span');
+  turnTag.className = 'phase-turn';
+  turnTag.textContent = $('turn-label').textContent;
+  $('phases').replaceChildren(turnTag, ...Engine.STEPS.map((s) => {
     const b = document.createElement('button');
     b.textContent = Engine.STEP_NAMES[s];
     b.dataset.phase = PHASE_ICON[s] ?? s;
@@ -468,16 +584,20 @@ function render() {
     }
   }
   $('my-pool').replaceChildren(...poolEls(me.pool));
+  $('my-mana').replaceChildren(...manaAvailEls(ME));
+  $('opp-mana').replaceChildren(...manaAvailEls(OPP));
   $('opp-pool').replaceChildren(...poolEls(opp.pool));
   $('opp-status').textContent = oppStatus(n);
   $('opp-area').classList.toggle('active-turn', G.active === OPP && G.turn > 0);
+  $('opp-player').classList.toggle('active', G.active === OPP && G.turn > 0);
+  $('my-player').classList.toggle('active', G.active === ME && G.turn > 0);
 
   // 戦場・手札
   const row = (p, lands) => G.battlefield.filter((id) => G.objects[id].controller === p && G.objects[id].def.types.includes('land') === lands);
   $('bf-main').replaceChildren(...row(ME, false).map((id) => cardEl(id)));
-  $('bf-lands').replaceChildren(...row(ME, true).map((id) => cardEl(id)));
+  $('bf-lands').replaceChildren(...landEls(row(ME, true)));
   $('opp-main').replaceChildren(...row(OPP, false).map((id) => cardEl(id)));
-  $('opp-lands').replaceChildren(...row(OPP, true).map((id) => cardEl(id)));
+  $('opp-lands').replaceChildren(...landEls(row(OPP, true)));
   $('hand').replaceChildren(...me.hand.map((id) => cardEl(id, 'hand')));
   $('hand-count').textContent = `(${me.hand.length})`;
   renderStack();
@@ -485,6 +605,80 @@ function render() {
   renderLog();
   renderViewer();
   showResultIfNew();
+}
+
+// 同じ土地はまとめて1枚に（「×5」）。タップ済み・カウンターなどがあるものは別に
+function landEls(ids) {
+  const groups = new Map();
+  const single = [];
+  for (const id of ids) {
+    const o = G.objects[id];
+    const plain = !o.animated && !o.attacking && o.blocking == null && !Object.values(o.counters).some((v) => v)
+      && !G.battlefield.some((x) => G.objects[x].attachedTo === id) && !isCand({ obj: id }) && !o.landOverride;
+    if (!plain) { single.push([id]); continue; }
+    const key = `${o.def.name}|${o.tapped}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(id);
+  }
+  // 並び：名前ごとにアンタップ → タップ
+  const list = [...groups.values(), ...single].sort((a, b) => {
+    const oa = G.objects[a[0]];
+    const ob = G.objects[b[0]];
+    return oa.card.name.localeCompare(ob.card.name) || Number(oa.tapped) - Number(ob.tapped);
+  });
+  return list.map((g) => {
+    const el = cardEl(g[0]);
+    el.dataset.ids = g.join(',');
+    if (g.length > 1) {
+      el.classList.add('stacked');
+      el.append(Object.assign(document.createElement('span'), { className: 'stack-count', textContent: `×${g.length}` }));
+      el.title = `${el.title}\n（${g.length}枚：${G.objects[g[0]].tapped ? 'タップ済み' : 'アンタップ'}）`;
+    }
+    return el;
+  });
+}
+
+// 今出せるマナ（アンタップ状態の土地・マナ能力）：色ごとの数
+function manaAvailEls(p) {
+  const srcs = Engine.manaSources(G, p);
+  if (!G.turn) return [];
+  const count = {};
+  let total = 0;
+  for (const s of srcs) {
+    const k = s.choices.length === 1 ? s.choices[0] : '★';
+    const n = s.fixed ? s.choices.length : s.amount;
+    count[k] = (count[k] ?? 0) + n;
+    total += n;
+  }
+  const head = Object.assign(document.createElement('span'), { className: 'mana-total', textContent: `使えるマナ ${total}` });
+  const order = ['W', 'U', 'B', 'R', 'G', 'C', '★'];
+  const parts = order.filter((k) => count[k]).map((k) => Object.assign(document.createElement('span'), {
+    className: `mana mana-${k === '★' ? 'any' : k}`, textContent: count[k] > 1 ? `${k}×${count[k]}` : k, title: k === '★' ? '複数の色から選べるマナ' : '',
+  }));
+  return [head, ...parts];
+}
+
+// 手札の呪文にカーソルを乗せたとき、自動で支払うときにタップされる土地などを光らせる
+function previewPayment(id) {
+  clearPaymentPreview();
+  if (!G || Engine.needs(G)?.player !== ME) return;
+  const o = G.objects[id];
+  if (!o || o.def.types.includes('land')) return;
+  const info = Engine.castInfo(G, ME, id);
+  if (!info.ok || !info.cost) return;
+  const plan = Engine.planPayment(G, ME, info.cost, 0, { exclude: id });
+  if (!plan) return;
+  const tapIds = new Set(plan.units.filter((u, i) => plan.used[i] && u.src).map((u) => u.src.id));
+  for (const el of document.querySelectorAll('#bf-lands .card, #bf-main .card')) {
+    const ids = (el.dataset.ids ?? '').split(',').filter(Boolean).map(Number);
+    const n = ids.filter((x) => tapIds.has(x)).length;
+    if (!n) continue;
+    el.classList.add('will-tap');
+    if (ids.length > 1) el.dataset.willTap = `${n}枚タップ`;
+  }
+}
+function clearPaymentPreview() {
+  for (const el of document.querySelectorAll('.card.will-tap')) { el.classList.remove('will-tap'); delete el.dataset.willTap; }
 }
 
 const poolEls = (pool) => Object.entries(pool).filter(([, k]) => k > 0).map(([c, k]) => Object.assign(document.createElement('span'), { className: `mana mana-${c}`, textContent: k > 1 ? `${c}×${k}` : c }));
@@ -600,7 +794,9 @@ function cardEl(id, zone = 'battlefield') {
       else if (phone()) showDetail(id);
     });
   }
-  el.addEventListener('mouseenter', () => showPreview(o));
+  el.dataset.ids = String(id);
+  el.addEventListener('mouseenter', () => { showPreview(o); if (zone === 'hand') previewPayment(id); });
+  if (zone === 'hand') el.addEventListener('mouseleave', clearPaymentPreview);
   el.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     if (!phone()) openCardMenu(id, e.clientX, e.clientY);
@@ -986,6 +1182,7 @@ function init() {
   $('opp-pile-exile').addEventListener('click', () => openViewer({ title: `${G.players[OPP].name}の追放`, player: OPP, zone: 'exile' }));
   $('viewer-close').addEventListener('click', closeViewer);
   $('viewer-ok').addEventListener('click', () => viewerState?.onOk?.());
+  $('announce').addEventListener('click', skipAnnounce);
   $('viewer').addEventListener('cancel', (e) => { e.preventDefault(); closeViewer(); });
   $('setup-form').addEventListener('submit', startFromSetup);
   $('setup-deck').addEventListener('change', updateSupport);
@@ -1006,6 +1203,8 @@ function init() {
     else if (e.key === 'Enter') { e.preventDefault(); ui.autoTurn = G.turn; act(ME, { type: 'pass' }); }
   });
   window.addEventListener('phonesheet', () => { hideMenu(); if (G) renderLog(); });
+  placePhases();
+  window.addEventListener('resize', placePhases);
   const requested = Number(new URLSearchParams(location.search).get('deck'));
   if (online() && duel.code) {
     // 再読み込み：同じ部屋に戻る

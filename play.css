@@ -526,6 +526,7 @@ html.phone .col-player {
   overflow: visible;
 }
 html.phone .col-player .avatar { width: 24px; flex: none; }
+html.phone .player-block.me { display: contents; }
 html.phone .player-block.opp {
   flex: 1 1 100%;
   flex-direction: row;
@@ -664,7 +665,7 @@ html.phone .viewer-cards .card { --card-w: 80px; }
   html.phone .hand, html.phone body.online .hand { --card-w: 50px; }
   html.phone .col-player { grid-column: 1; grid-row: 1; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; overflow-y: auto; }
   html.phone .player-block.opp { flex: none; flex-wrap: wrap; gap: 4px 8px; }
-  html.phone .col-player > .life { flex-wrap: wrap; }
+  html.phone .col-player .life { flex-wrap: wrap; }
   html.phone .piles { flex-wrap: wrap; gap: 4px 10px; }
   html.phone .col-left { grid-column: 1; grid-row: 2; grid-template-columns: auto minmax(0, 1fr); }
   html.phone .phases { display: none; }
@@ -712,3 +713,94 @@ html.phone .tools-lang { display: flex; justify-content: center; gap: 10px; padd
 .setup .panel-head { height: auto; min-height: 25px; padding-top: 2px; padding-bottom: 2px; }
 
 html[lang="en"] .preview-frame:has(#preview[hidden]):has(#preview-text[hidden])::after { content: "Hover over a card to preview it"; }
+
+/* ==========================================================
+   PC：画面いっぱいのレイアウト
+   ・列の幅、カード・アバター・ライフの大きさを、画面の幅と高さの両方から決める（cqw / cqh）
+   ・雰囲気（暗いパネル・フェルトの戦場・アイコン）はそのままに、パネルと戦場に少し奥行きを付ける
+   ========================================================== */
+
+html:not(.phone) {
+  /* 戦場のカード：高さで決め、横長の画面でも大きくなりすぎないよう幅でも抑える */
+  --card-w: clamp(60px, min(11.5cqh, 7.2cqw), 140px);
+}
+html:not(.phone) .table {
+  grid-template-columns: clamp(230px, 17cqw, 360px) clamp(124px, 8.6cqw, 180px) minmax(0, 1fr) clamp(250px, 18cqw, 400px);
+  gap: clamp(4px, .4cqw, 8px);
+  max-width: none;
+  padding: clamp(4px, .4cqw, 8px);
+}
+html:not(.phone) body.online .table { --card-w: clamp(50px, min(9.2cqh, 6.2cqw), 128px); }
+html:not(.phone) .hand { --card-w: clamp(64px, min(11.5cqh, 7.6cqw), 136px); }
+html:not(.phone) body.online .hand { --card-w: clamp(60px, min(10.4cqh, 7cqw), 128px); }
+html:not(.phone) .hand { min-height: calc(var(--card-w) * 1.395 + 22px); }
+
+/* パネル：上からのわずかな光で立体感を出す（色はそのまま） */
+html:not(.phone) .col-left,
+html:not(.phone) .col-player,
+html:not(.phone) .col-right .panel {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(0, 0, 0, .1));
+}
+html:not(.phone) .topbar { box-shadow: 0 1px 0 #000, 0 2px 0 rgba(255, 255, 255, .05); }
+
+/* 左列：カードの拡大を大きく、フェイズの一覧は高さに余裕があれば広げる */
+html:not(.phone) .preview-frame { width: min(100%, calc(44cqh / 1.395 + 12px)); }
+html:not(.phone) .phase-hint { font-size: clamp(12px, 1.3cqh, 15px); }
+html:not(.phone) .turn-label { font-size: clamp(14px, 1.5cqh, 17px); }
+html:not(.phone) .phase-actions { margin-top: auto; }
+html:not(.phone) .phase-actions button { min-height: clamp(30px, 4.2cqh, 46px); font-size: clamp(13px, 1.4cqh, 16px); }
+
+/* プレイヤー列：アバター・ライフ・山札を画面の高さに合わせて */
+html:not(.phone) .avatar { width: clamp(52px, 7.6cqh, 96px); }
+html:not(.phone) #life, html:not(.phone) .opp-life { font-size: clamp(28px, 4.6cqh, 52px); }
+html:not(.phone) .pile { grid-template-columns: clamp(26px, 3.4cqh, 38px) 1fr; }
+html:not(.phone) .pile-icon { width: clamp(26px, 3.4cqh, 38px); height: clamp(26px, 3.4cqh, 38px); }
+html:not(.phone) .pile-count { font-size: clamp(17px, 2.2cqh, 26px); }
+html:not(.phone) .player-name { font-size: clamp(12px, 1.35cqh, 15px); }
+
+/* 戦場：周りを少し暗くして、カードを中央に並べる */
+html:not(.phone) .board { box-shadow: var(--sunken), inset 0 0 clamp(30px, 6cqh, 90px) rgba(0, 0, 0, .55); }
+html:not(.phone) .battlefield { padding: clamp(8px, 1.2cqh, 18px) clamp(10px, 1.2cqw, 24px); gap: clamp(6px, 1.1cqh, 16px); }
+html:not(.phone) .bf-row { justify-content: center; gap: clamp(6px, .6cqw, 12px); }
+html:not(.phone) .opp-area { border-bottom: 1px solid #000; box-shadow: 0 1px rgba(255, 255, 255, .12), 0 2px 8px rgba(0, 0, 0, .4); }
+html:not(.phone) .opp-status { background: linear-gradient(#444, #383838); }
+
+/* 手札：台のような帯にして中央に並べる */
+html:not(.phone) .hand-area { background: linear-gradient(#323232, #262626); box-shadow: inset 0 1px rgba(255, 255, 255, .06); }
+html:not(.phone) .zone-label { background: linear-gradient(#525252, #444); }
+html:not(.phone) .hand { justify-content: safe center; gap: clamp(6px, .55cqw, 12px); padding: clamp(6px, 1cqh, 12px) 12px clamp(4px, .8cqh, 10px); }
+html:not(.phone) .hand .card { transition: transform .12s ease-out; }
+html:not(.phone) .hand .card:hover { transform: translateY(-8px); z-index: 2; }
+
+/* 右列：ログを読みやすく */
+html:not(.phone) .log { font-size: clamp(12px, 1.3cqh, 14px); }
+html:not(.phone) .tools button { min-height: clamp(26px, 3.2cqh, 34px); }
+
+/* 一覧ダイアログのカードも画面に合わせて */
+html:not(.phone) .viewer { width: min(1200px, 90vw); }
+html:not(.phone) .viewer-cards .card { --card-w: clamp(96px, 11cqh, 150px); }
+html:not(.phone) .viewer-cards { max-height: 64vh; }
+
+/* 横に広い画面（1600px 以上）：文字も少し大きく */
+@container (min-width: 1600px) {
+  html:not(.phone) .app { font-size: 15px; }
+  html:not(.phone) .phases button, html:not(.phone) .phases button:disabled { font-size: 14px; padding-top: 3px; padding-bottom: 3px; }
+  html:not(.phone) .card .pt { font-size: 14px; line-height: 18px; padding: 0 5px; }
+  html:not(.phone) .card .text { font-size: 14px; }
+}
+/* 縦にも余裕がある画面（高さ 950px 以上）：フェイズの一覧を広げる */
+@container (min-height: 950px) {
+  html:not(.phone) .phases button, html:not(.phone) .phases button:disabled { padding-top: 4px; padding-bottom: 4px; }
+}
+/* ノートPCの横幅（1280〜1440px）：左右の列を少し狭く、説明文は隠す */
+@container (max-width: 1440px) {
+  html:not(.phone) .table { grid-template-columns: clamp(210px, 17cqw, 280px) clamp(112px, 8.6cqw, 140px) minmax(0, 1fr) clamp(220px, 17.5cqw, 290px); }
+  html:not(.phone) .hint { display: none; }
+}
+/* 狭いウィンドウ（1100px 以下）：4列のまま、左右の列を細くする */
+@container (max-width: 1100px) {
+  html:not(.phone) .table { grid-template-columns: 188px 104px minmax(0, 1fr) 196px; }
+  html:not(.phone) .preview-frame { width: min(100%, calc(30cqh / 1.395 + 12px)); }
+  html:not(.phone) .pile-name { font-size: 11px; }
+  html:not(.phone) .tools button { font-size: 12px; }
+}

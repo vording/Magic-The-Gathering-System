@@ -98,6 +98,7 @@ const Engine = (() => {
   const hasSub = (o, w) => (o.def.statics.some((st) => st.allTypes) && o.def.types.includes('creature') && !LAND_TYPES.includes(w.toLowerCase())) || [...(o.landOverride ? o.def.subtypes.filter((t) => !LAND_TYPES.includes(t.toLowerCase())).concat([o.landOverride]) : o.def.subtypes), ...(o.animated?.subtypes ?? [])].some((s) => s.toLowerCase() === w.toLowerCase() || s.toLowerCase() === singular(w));
   const isCreatureObj = (G, id) => isType(obj(G, id), 'creature');
   const log = (G, p, text) => {
+    G.logTotal = (G.logTotal ?? G.log.length) + 1; // 古いログを消しても、通算の数は分かるように
     G.log.push({ turn: G.turn, p, text });
     if (G.log.length > 400) G.log.splice(0, G.log.length - 400);
   };

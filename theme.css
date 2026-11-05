@@ -205,26 +205,22 @@ dialog .status, dialog .hint { color: var(--muted); }
 
 * { scrollbar-color: #646464 #343434; scrollbar-width: thin; }
 
-/* ---------- 4:3 の枠 ----------
-   画面の中央に 4:3 の枠を置き、余った部分は黒い帯にする。
-   枠の中のサイズ指定は cqw / cqh（枠の幅・高さに対する割合）を使う */
+/* ---------- PC：画面いっぱい ----------
+   ウィンドウ全体を使う（以前は 4:3 の枠）。枠の中のサイズ指定は cqw / cqh（枠の幅・高さに対する割合）を使うので、
+   16:9・16:10・21:9 やノートPCの低い画面でも、列の幅やカードの大きさが画面に合わせて変わる。
+   とても小さいウィンドウでは崩れないよう最小の大きさを決め、はみ出す分はスクロールする */
 html, body { height: 100%; }
 .app {
   container-type: size;
   overflow: hidden;
   background: var(--bg);
 }
-html:not(.phone) body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: var(--bg); /* 4:3 の枠の外側もウィンドウと同じ色で塗る */
-}
+html:not(.phone) body { overflow: auto; background: var(--bg); }
 html:not(.phone) .app {
-  flex: none;
-  width: min(100vw, calc(100vh * 4 / 3));
-  height: min(100vh, calc(100vw * 3 / 4));
+  width: 100%;
+  height: 100vh;
+  min-width: 980px;
+  min-height: 620px;
 }
 
 /* ---------- スマホ（device.js が <html class="phone"> にする） ----------
@@ -301,3 +297,11 @@ html.phone .logo-img { height: 24px; }
 .lang-btn:hover:not(:disabled) { box-shadow: 0 0 0 2px #ddd; }
 .lang-btn svg { display: block; width: 100%; height: 100%; }
 html.phone .lang-btn, html.phone .lang-btn:hover:not(:disabled), html.phone .lang-btn:active:not(:disabled) { width: 22px; height: 22px; min-height: 0; padding: 0; }
+
+/* ---------- 項目名（見出し）だけ明朝体 ---------- */
+:root { --font-ui: "MS UI Gothic", Tahoma, Verdana, "Meiryo UI", "Meiryo", "Hiragino Sans", sans-serif; --font-heading: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", "Noto Serif CJK JP", "MS PMincho", Georgia, "Times New Roman", serif; }
+.panel-head, .section-title, .deck h3, .zone-label, .stack-label, .order legend, .opp-status, .player-name, .phase-turn {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: .03em;
+}

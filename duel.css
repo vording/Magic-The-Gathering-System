@@ -46,3 +46,272 @@ html[lang="en"] .card.manual::before { content: "M"; }
 .support-report { font-size: 12px; max-height: 9em; overflow: auto; }
 .support-report ul { margin: 4px 0 0; padding-left: 1.2em; color: var(--muted, #888); }
 .cpu-deck-field { margin: 4px 0 4px 1.6em; }
+
+/* 唱えた呪文・能力の表示（画面の中央） */
+.board { position: relative; }
+.announce {
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 30;
+  display: flex; align-items: center; gap: 14px; padding: 12px 16px; max-width: min(92%, 560px);
+  background: rgba(20, 16, 12, .92); border: 2px solid #e8c66a; border-radius: 8px; box-shadow: 0 8px 30px rgba(0, 0, 0, .6);
+  color: #f2eee6; cursor: pointer;
+}
+.announce[hidden] { display: none; }
+.announce.mine { border-color: #9cc6ff; }
+.announce.show { animation: announce-in .22s ease-out; }
+@keyframes announce-in { from { opacity: 0; transform: translate(-50%, -46%) scale(.94); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+.announce img { width: clamp(110px, 16vw, 190px); border-radius: 6px; flex: none; }
+.announce-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.announce-who { font-size: 13px; color: #e8c66a; }
+.announce.mine .announce-who { color: #9cc6ff; }
+.announce-name { font-size: 20px; font-weight: bold; }
+.announce-targets { font-size: 14px; color: #ffcf9a; }
+.announce-body { font-size: 12px; color: #cfc8bb; white-space: pre-wrap; max-height: 8em; overflow: hidden; }
+html.phone .announce { top: 38%; padding: 8px 10px; gap: 8px; }
+html.phone .announce img { width: 96px; }
+html.phone .announce-name { font-size: 16px; }
+
+/* 主な出来事（画面の上） */
+.ticker { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); z-index: 25; display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; width: min(96%, 640px); }
+.ticker-item { font-size: 12px; line-height: 1.4; padding: 2px 10px; border-radius: 10px; background: rgba(0, 0, 0, .72); color: #f2eee6; animation: ticker-in .25s ease-out; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticker-item.theirs { border-left: 3px solid #ff9a8a; }
+.ticker-item.mine { border-left: 3px solid #9cc6ff; }
+@keyframes ticker-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* 土地：まとめた枚数・使えるマナ・タップされる予告 */
+.card.stacked { box-shadow: 3px -3px 0 -1px rgba(255, 255, 255, .55), 6px -6px 0 -2px rgba(255, 255, 255, .35); }
+.card .stack-count {
+  position: absolute; right: 3px; top: 3px; z-index: 3; font: bold 13px/18px sans-serif; padding: 0 6px; border-radius: 9px;
+  background: rgba(0, 0, 0, .8); color: #fff; pointer-events: none;
+}
+.card.will-tap { outline: 3px solid #7de07d; outline-offset: 2px; box-shadow: 0 0 12px #7de07d; }
+.card.will-tap[data-will-tap]::after {
+  content: attr(data-will-tap); position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); z-index: 3;
+  font: bold 10px/14px sans-serif; padding: 0 4px; border-radius: 3px; background: #2f7a2f; color: #fff; white-space: nowrap; pointer-events: none;
+}
+.mana-avail { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; align-items: center; font-size: 11px; color: var(--muted, #aaa); margin: 2px 0; }
+.mana-avail:empty { display: none; }
+.mana-avail .mana-total { margin-right: 2px; }
+.mana-any { background: linear-gradient(90deg, #f8f4dc, #9cc9ef, #a99fa0, #f09477, #9bd3ae); }
+html.phone .mana-avail { flex-wrap: nowrap; margin: 0; }
+html.phone .mana-avail .mana-total { display: none; }
+
+/* ==========================================================
+   PC のルール対戦：対戦ソフトらしい配置
+   左：相手（上）・カードの拡大・案内と決定ボタン・自分（下）
+   中央：相手の戦場／自分の戦場／横長のフェイズ・バー／手札
+   右：ログ（縦いっぱい）とコマンド
+   スタックは戦場の左に浮かぶ窓
+   ========================================================== */
+html:not(.phone) body.duel .table {
+  grid-template-columns: clamp(188px, 12.5cqw, 270px) minmax(0, 1fr) clamp(230px, 16cqw, 340px);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+}
+html:not(.phone) body.duel .col-left,
+html:not(.phone) body.duel .col-player { display: contents; }
+html:not(.phone) body.duel .board { grid-column: 2; grid-row: 1 / -1; }
+html:not(.phone) body.duel .col-right { grid-column: 3; grid-row: 1 / -1; min-height: 0; }
+
+/* 左の列：それぞれをパネルに */
+html:not(.phone) body.duel #opp-player { grid-column: 1; grid-row: 1; }
+html:not(.phone) body.duel .preview-frame { grid-column: 1; grid-row: 2; }
+html:not(.phone) body.duel .status-box { grid-column: 1; grid-row: 3; }
+html:not(.phone) body.duel .phase-actions { grid-column: 1; grid-row: 3; align-self: end; }
+html:not(.phone) body.duel #my-player { grid-column: 1; grid-row: 4; }
+html:not(.phone) body.duel .player-block,
+html:not(.phone) body.duel .status-box {
+  background: var(--panel) linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(0, 0, 0, .12));
+  border: 1px solid #000;
+  box-shadow: var(--raised);
+}
+
+/* プレイヤー：大きなアバターにライフを重ねる（自分の番は枠が光る） */
+html:not(.phone) body.duel .player-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "av" "name" "mana" "piles";
+  gap: 4px;
+  margin: 0;
+  padding: 6px;
+}
+html:not(.phone) body.duel .player-block .avatar {
+  grid-area: av;
+  width: 100%;
+  height: clamp(64px, 11cqh, 150px);
+  aspect-ratio: auto;
+  background-position: center 25%;
+  border: 2px solid #1a1a1a;
+}
+html:not(.phone) body.duel .player-block .life {
+  grid-area: av;
+  align-self: end;
+  justify-self: center;
+  pointer-events: none;
+}
+html:not(.phone) body.duel #life,
+html:not(.phone) body.duel .opp-life {
+  font: bold clamp(34px, 6.4cqh, 72px) Georgia, "Times New Roman", serif;
+  line-height: 1;
+  text-shadow: 0 0 4px #000, 0 2px 6px #000, 0 0 14px rgba(0, 0, 0, .8);
+  pointer-events: auto;
+}
+html:not(.phone) body.duel #life::before,
+html:not(.phone) body.duel .opp-life::before { display: none; }
+html:not(.phone) body.duel .player-block .player-name {
+  grid-area: name;
+  margin: 0;
+  font-size: clamp(12px, 1.4cqh, 15px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html:not(.phone) body.duel .player-block .pool { grid-area: mana; }
+html:not(.phone) body.duel .player-block .mana-avail { grid-area: mana; justify-content: center; margin: 0; }
+html:not(.phone) body.duel .player-block .pool:not(:empty) + .mana-avail { display: none; }
+html:not(.phone) body.duel .player-block .piles {
+  grid-area: piles;
+  flex-direction: row;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+}
+html:not(.phone) body.duel .player-block .pile {
+  grid-template-columns: auto auto;
+  grid-template-rows: auto;
+  column-gap: 2px;
+  padding: 2px 4px;
+  background: #2b2b2b;
+  box-shadow: var(--sunken);
+}
+html:not(.phone) body.duel .player-block .pile-icon { grid-row: 1; width: clamp(20px, 2.6cqh, 28px); height: clamp(20px, 2.6cqh, 28px); }
+html:not(.phone) body.duel .player-block .pile-count { font-size: clamp(14px, 1.9cqh, 20px); }
+html:not(.phone) body.duel .player-block .pile-name { display: none; }
+html:not(.phone) body.duel .player-block.active .avatar { border-color: #7fb2ff; box-shadow: 0 0 0 1px #000, 0 0 12px rgba(127, 178, 255, .7); }
+
+/* カードの拡大：残りの高さに収める */
+html:not(.phone) body.duel .preview-frame {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+html:not(.phone) body.duel .preview-frame .preview,
+html:not(.phone) body.duel .preview-frame .preview-text { width: auto; max-width: 100%; max-height: 100%; }
+html:not(.phone) body.duel .preview-frame .preview-text { height: 100%; overflow: auto; font-size: clamp(12px, 1.3cqh, 15px); }
+html:not(.phone) body.duel .preview-frame:has(#preview[hidden]):has(#preview-text[hidden])::after { height: 100%; max-width: 100%; }
+
+/* 案内：いまの状況と、決定ボタン */
+html:not(.phone) body.duel .status-box {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 8px calc(clamp(30px, 4.2cqh, 46px) * 2 + 16px);
+  min-height: calc(clamp(30px, 4.2cqh, 46px) * 2 + 90px);
+  border-left: 3px solid #7fb2ff;
+}
+html:not(.phone) body.duel .phase-hint { min-height: 0; font-size: clamp(12px, 1.35cqh, 15px); line-height: 1.45; color: #e6e6e6; }
+html:not(.phone) body.duel .phase-actions { margin: 0 8px 8px 11px; grid-template-columns: 1fr; }
+html:not(.phone) body.duel .phase-actions .phase-current { display: none; }
+html:not(.phone) body.duel .phase-actions #next-phase { font-weight: bold; }
+
+/* 戦場：相手と自分で色味を分け、間に区切り */
+html:not(.phone) body.duel .board { box-shadow: var(--sunken); }
+html:not(.phone) body.duel .opp-area { background: rgba(170, 190, 220, .07); }
+html:not(.phone) body.duel .board > .battlefield { background: rgba(0, 0, 0, .12); }
+html:not(.phone) body.duel .battlefield.opp { justify-content: flex-start; }
+html:not(.phone) body.duel .board > .battlefield { justify-content: flex-end; }
+
+/* フェイズ・バー：戦場と手札の間の横1行 */
+html:not(.phone) body.duel .board > .phases {
+  flex: none;
+  flex-direction: row;
+  align-items: stretch;
+  border: none;
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #000;
+  background: linear-gradient(#3a3a3a, #262626);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .08);
+}
+html:not(.phone) body.duel .phase-turn {
+  flex: 0 1 auto;
+  max-width: 22%;
+  padding: 0 12px;
+  align-self: center;
+  font-weight: bold;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(12px, 1.4cqh, 15px);
+}
+html:not(.phone) body.duel .board > .phases button,
+html:not(.phone) body.duel .board > .phases button:disabled {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: clamp(3px, .6cqh, 7px) 2px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(11px, 1.3cqh, 14px);
+  color: #9a9a9a;
+  border-bottom: none;
+}
+html:not(.phone) body.duel .board > .phases button::before { display: none; }
+html:not(.phone) body.duel .board > .phases button.current,
+html:not(.phone) body.duel .board > .phases button.current:disabled {
+  color: #fff;
+  background: linear-gradient(#6a6a6a, #4a4a4a);
+  border-radius: 12px;
+  margin: 3px 0;
+  box-shadow: 0 0 0 1px #000, 0 0 0 2px #e8c66a, 0 0 10px rgba(232, 198, 106, .45);
+}
+html:not(.phone) body.duel .hand-area .zone-label { display: none; }
+html:not(.phone) body.duel .hand-area { border-top: none; }
+html:not(.phone) body.duel .hand { justify-content: flex-start; }
+
+/* スタック：戦場の左に浮かぶ窓（上が最後に積まれたもの） */
+html:not(.phone) body.duel .stack-panel {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-60%);
+  z-index: 20;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: clamp(170px, 14cqw, 260px);
+  max-height: 70%;
+  margin: 0;
+  padding: 0 0 8px;
+  background: rgba(18, 18, 22, .94);
+  border: 1px solid #000;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px #5c5c5c, 0 8px 24px rgba(0, 0, 0, .6);
+}
+html:not(.phone) body.duel .stack-label {
+  padding: 4px 10px;
+  font: bold clamp(14px, 1.8cqh, 19px) var(--font-heading);
+  background: linear-gradient(#4a4a4a, #2e2e2e);
+  border-bottom: 1px solid #000;
+  border-radius: 6px 6px 0 0;
+}
+html:not(.phone) body.duel .stack-items { flex-direction: column; overflow-y: auto; overflow-x: hidden; padding: 0 8px; }
+html:not(.phone) body.duel .stack-item { max-width: none; flex-direction: column; align-items: stretch; text-align: left; }
+html:not(.phone) body.duel .stack-item img { width: 100%; border-radius: 4px; }
+html:not(.phone) body.duel .stack-item:not(.top) img { width: 40%; }
+
+/* ログ：縦いっぱい */
+html:not(.phone) body.duel .col-right { display: flex; flex-direction: column; gap: inherit; }
+html:not(.phone) body.duel .col-right .log-box { flex: 1; min-height: 0; }
+html:not(.phone) body.duel .col-right .hint { display: none; }
+
+@container (max-width: 1100px) {
+  html:not(.phone) body.duel .table { grid-template-columns: 176px minmax(0, 1fr) 200px; }
+}
+html:not(.phone) body.duel .preview-frame:has(#preview[hidden]):has(#preview-text[hidden])::after { aspect-ratio: auto; width: 100%; }
+html:not(.phone) body.duel .stack-item.top img { max-height: 34cqh; object-fit: contain; }
+html:not(.phone) body.duel .status-line { flex-wrap: wrap; row-gap: 2px; }
+html:not(.phone) body.duel .preview-frame .preview { height: 100%; width: auto; object-fit: contain; }
+html:not(.phone) body.duel .preview-frame { padding: 4px; }
+html:not(.phone) body.duel .preview-frame { align-self: stretch; height: auto; }
