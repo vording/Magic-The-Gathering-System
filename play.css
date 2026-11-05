@@ -722,7 +722,7 @@ html[lang="en"] .preview-frame:has(#preview[hidden]):has(#preview-text[hidden]):
 
 html:not(.phone) {
   /* 戦場のカード：高さで決め、横長の画面でも大きくなりすぎないよう幅でも抑える */
-  --card-w: clamp(60px, min(11.5cqh, 7.2cqw), 140px);
+  --card-w: clamp(66px, min(13.5cqh, 8.4cqw), 180px);
 }
 html:not(.phone) .table {
   grid-template-columns: clamp(230px, 17cqw, 360px) clamp(124px, 8.6cqw, 180px) minmax(0, 1fr) clamp(250px, 18cqw, 400px);
@@ -730,9 +730,14 @@ html:not(.phone) .table {
   max-width: none;
   padding: clamp(4px, .4cqw, 8px);
 }
-html:not(.phone) body.online .table { --card-w: clamp(50px, min(9.2cqh, 6.2cqw), 128px); }
-html:not(.phone) .hand { --card-w: clamp(64px, min(11.5cqh, 7.6cqw), 136px); }
-html:not(.phone) body.online .hand { --card-w: clamp(60px, min(10.4cqh, 7cqw), 128px); }
+html:not(.phone) body.online .table { --card-w: clamp(58px, min(11cqh, 7.6cqw), 168px); }
+/* 土地は少し小さく（戦場の高さを生き物に回す） */
+html:not(.phone) body.online .bf-row.lands { --card-w: clamp(46px, min(7cqh, 5cqw), 120px); }
+html:not(.phone) body.online .battlefield { padding: clamp(4px, .7cqh, 10px) clamp(8px, 1cqw, 20px); gap: clamp(4px, .7cqh, 10px); }
+html:not(.phone) body.online .bf-row.lands { padding-top: clamp(4px, .6cqh, 8px); }
+html:not(.phone) body.online .battlefield.opp .bf-row.lands { padding: 0 0 clamp(4px, .6cqh, 8px); }
+html:not(.phone) .hand { --card-w: clamp(72px, min(14.5cqh, 9cqw), 190px); }
+html:not(.phone) body.online .hand { --card-w: clamp(64px, min(12cqh, 8.6cqw), 170px); }
 html:not(.phone) .hand { min-height: calc(var(--card-w) * 1.395 + 22px); }
 
 /* パネル：上からのわずかな光で立体感を出す（色はそのまま） */
@@ -778,7 +783,7 @@ html:not(.phone) .tools button { min-height: clamp(26px, 3.2cqh, 34px); }
 
 /* 一覧ダイアログのカードも画面に合わせて */
 html:not(.phone) .viewer { width: min(1200px, 90vw); }
-html:not(.phone) .viewer-cards .card { --card-w: clamp(96px, 11cqh, 150px); }
+html:not(.phone) .viewer-cards .card { --card-w: clamp(110px, 15cqh, 210px); }
 html:not(.phone) .viewer-cards { max-height: 64vh; }
 
 /* 横に広い画面（1600px 以上）：文字も少し大きく */

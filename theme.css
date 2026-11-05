@@ -35,7 +35,7 @@
 body {
   margin: 0;
   color: var(--ink);
-  font-family: "MS UI Gothic", Tahoma, Verdana, "Meiryo UI", "Meiryo", "Hiragino Sans", sans-serif;
+  font-family: var(--font-heading);
   font-size: 14px;
   line-height: 1.45;
   background: var(--bg);
@@ -87,7 +87,7 @@ a { color: var(--ink); }
 /* ---------- ボタン（控えめ） ---------- */
 
 button {
-  font: 14px "MS UI Gothic", Tahoma, Verdana, "Meiryo UI", "Meiryo", sans-serif;
+  font: 14px var(--font-heading);
   color: var(--ink);
   background: #464646;
   border: 1px solid #000;
@@ -105,7 +105,7 @@ button.primary { color: var(--white); font-weight: bold; outline: 1px solid #747
 /* ---------- 入力 ---------- */
 
 input[type="search"], input[type="text"], select {
-  font: 14px "MS UI Gothic", Tahoma, Verdana, "Meiryo UI", "Meiryo", sans-serif;
+  font: 14px var(--font-heading);
   color: var(--ink);
   background: #2d2d2d;
   border: 1px solid #444444;
@@ -298,10 +298,12 @@ html.phone .logo-img { height: 24px; }
 .lang-btn svg { display: block; width: 100%; height: 100%; }
 html.phone .lang-btn, html.phone .lang-btn:hover:not(:disabled), html.phone .lang-btn:active:not(:disabled) { width: 22px; height: 22px; min-height: 0; padding: 0; }
 
-/* ---------- 項目名（見出し）だけ明朝体 ---------- */
+/* ---------- 文字は明朝体（項目名は太字）。カードの上の小さな文字だけゴシック ---------- */
 :root { --font-ui: "MS UI Gothic", Tahoma, Verdana, "Meiryo UI", "Meiryo", "Hiragino Sans", sans-serif; --font-heading: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", "Noto Serif CJK JP", "MS PMincho", Georgia, "Times New Roman", serif; }
 .panel-head, .section-title, .deck h3, .zone-label, .stack-label, .order legend, .opp-status, .player-name, .phase-turn {
   font-family: var(--font-heading);
   font-weight: 700;
   letter-spacing: .03em;
 }
+.card, .card .text, .card .pt { font-family: var(--font-ui); }
+.toast, .announce, .banner, .menu, dialog, .ticker, .phase-hint, .log { font-family: var(--font-heading); }
