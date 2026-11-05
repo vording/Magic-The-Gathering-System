@@ -307,6 +307,126 @@ if (AI) tests['AI vs AI plays a full game'] = () => {
   }
 };
 
+// 旧枠モダンの全カード：読み取りとエンジンの対応がそろっているか、ランダムなデッキで CPU 同士が最後まで遊べるか
+const pool = (() => { try { return require('../data/oldframe-modern.json').cards; } catch { return null; } })();
+if (pool) {
+  tests['oldframe-modern: compiled effects are all supported by the engine'] = () => {
+    const bad = [];
+    for (const card of pool) {
+      const def = CardText.compile(card);
+      const u = Engine.unsupported(def);
+      if (u.length) bad.push(`${card.name}: ${u.join(', ')}`);
+    }
+    assert.deepEqual(bad, []);
+  };
+  // 実際のカードの Oracle テキストで、ルールの処理を確かめる
+  const P = (name) => { const c = pool.find((x) => x.name === name); assert.ok(c, `not in pool: ${name}`); return c; };
+  tests['real cards: amounts, auras, threshold'] = () => {
+    const G = setup({ p0: { hand: [P('Corrupt')], bf: [P('Swamp'), P('Swamp'), P('Swamp'), P('Swamp'), P('Swamp'), P('Swamp')] }, p1: {} });
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Corrupt'), targets: [{ player: 1 }] }));
+    passBoth(G);
+    assert.equal(G.players[1].life, 14);
+    assert.equal(G.players[0].life, 26);
+    const H = setup({ p0: { hand: [P('Blanchwood Armor')], bf: [K.bears, P('Forest'), P('Forest'), P('Forest')] } });
+    ok(Engine.perform(H, 0, { type: 'cast', id: id(H, 'Blanchwood Armor'), targets: [{ obj: id(H, 'Grizzly Bears') }] }));
+    passBoth(H);
+    assert.equal(Engine.ch(H, id(H, 'Grizzly Bears')).p, 5);
+    const M = setup({ p0: { bf: [P('Nimble Mongoose')], grave: Array(7).fill(L.Mountain) } });
+    assert.equal(Engine.ch(M, id(M, 'Nimble Mongoose')).p, 3);
+    assert.ok(Engine.ch(M, id(M, 'Nimble Mongoose')).kw.has('shroud'));
+    const T = setup({ p0: { bf: [P('Priest of Titania'), P('Llanowar Elves')] } });
+    ok(Engine.perform(T, 0, { type: 'activate', id: id(T, 'Priest of Titania'), index: 0 }));
+    assert.equal(T.players[0].pool.G, 2);
+  };
+  tests['real cards: modal, prevention, discard, look'] = () => {
+    const G = setup({ p0: { hand: [P('Funeral Charm')], bf: [P('Swamp')] }, p1: { hand: [K.bears] } });
+    const info = Engine.castInfo(G, 0, id(G, 'Funeral Charm'));
+    assert.ok(info.needMode && info.modes === 3);
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Funeral Charm'), mode: 0, targets: [{ player: 1 }] }));
+    passBoth(G);
+    assert.equal(Engine.needs(G).type, 'discard');
+    const C = setup({ p0: { bf: [P('Circle of Protection: Red'), L.Plains] }, p1: { hand: [K.bolt], bf: [L.Mountain] } });
+    ok(Engine.perform(C, 0, { type: 'activate', id: id(C, 'Circle of Protection: Red'), index: 0 }));
+    passBoth(C);
+    ok(Engine.perform(C, 0, { type: 'pass' }));
+    ok(Engine.perform(C, 1, { type: 'cast', id: id(C, 'Lightning Bolt'), targets: [{ player: 0 }] }));
+    passBoth(C);
+    assert.equal(C.players[0].life, 20);
+    const D = setup({ p0: { hand: [P('Coercion')], bf: [L.Swamp, L.Swamp, L.Swamp] }, p1: { hand: [K.bears, K.bolt] } });
+    ok(Engine.perform(D, 0, { type: 'cast', id: id(D, 'Coercion'), targets: [{ player: 1 }] }));
+    passBoth(D);
+    assert.equal(Engine.needs(D).type, 'chooseHand');
+    ok(Engine.perform(D, 0, { type: 'choose', ids: [id(D, 'Lightning Bolt')] }));
+    assert.equal(D.objects[id(D, 'Lightning Bolt')].zone, 'graveyard');
+    const S = setup({ p0: { hand: [P('Sleight of Hand')], bf: [L.Island], library: [K.bolt, K.bears] } });
+    ok(Engine.perform(S, 0, { type: 'cast', id: id(S, 'Sleight of Hand') }));
+    passBoth(S);
+    assert.equal(Engine.needs(S).type, 'lookPick');
+    ok(Engine.perform(S, 0, { type: 'choose', ids: [S.pending.options[1]] }));
+    assert.equal(S.players[0].hand.length, 1);
+  };
+  tests['real cards: triggers (Grave Pact, Megrim, Sengir Vampire, Hunting Moa)'] = () => {
+    const G = setup({ p0: { hand: [K.bolt], bf: [P('Grave Pact'), K.bears, L.Mountain] }, p1: { bf: [K.giant] } });
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Lightning Bolt'), targets: [{ obj: id(G, 'Grizzly Bears') }] }));
+    passBoth(G); passBoth(G);
+    assert.equal(G.objects[id(G, 'Hill Giant')].zone, 'graveyard');
+    const M = setup({ p0: { hand: [K.rot], bf: [P('Megrim'), L.Swamp, L.Swamp, L.Swamp] }, p1: { hand: [K.bears, K.giant] } });
+    ok(Engine.perform(M, 0, { type: 'cast', id: id(M, 'Mind Rot'), targets: [] }));
+    passBoth(M);
+    ok(Engine.perform(M, 1, { type: 'choose', ids: [id(M, 'Grizzly Bears'), id(M, 'Hill Giant')] }));
+    passBoth(M); passBoth(M);
+    assert.equal(M.players[1].life, 16);
+    const V = setup({ p0: { bf: [P('Sengir Vampire')] }, p1: { bf: [K.bears] }, step: 'begincombat' });
+    passBoth(V);
+    ok(Engine.perform(V, 0, { type: 'attackers', ids: [id(V, 'Sengir Vampire')] }));
+    // 飛行なのでブロックできない → 直接の確認：戦闘ダメージでベアーズを倒したことにして誘発を確かめる
+    V.objects[id(V, 'Grizzly Bears')].damagedBy = [id(V, 'Sengir Vampire')];
+    V.objects[id(V, 'Grizzly Bears')].damage = 2;
+    passBoth(V); passBoth(V); passBoth(V);
+    assert.equal(V.objects[id(V, 'Sengir Vampire')].counters.p1, 1);
+    const H = setup({ p0: { hand: [P('Hunting Moa')], bf: [L.Forest, L.Forest, L.Forest] } });
+    ok(Engine.perform(H, 0, { type: 'cast', id: id(H, 'Hunting Moa') }));
+    passBoth(H);
+    ok(Engine.perform(H, 0, { type: 'target', target: { obj: id(H, 'Hunting Moa') } }));
+    passBoth(H);
+    assert.equal(H.objects[id(H, 'Hunting Moa')].counters.p1, 1);
+  };
+  tests['oldframe-modern: random decks play to the end'] = () => {
+    const games = Number(process.env.GAMES ?? 40);
+    const basics = pool.filter((c) => /Basic Land/.test(c.typeLine) && !/Snow/.test(c.typeLine));
+    const spells = pool.filter((c) => !/Land/.test(c.typeLine));
+    let rng = 12345;
+    const r = () => { rng = (rng * 1103515245 + 12345) % 2 ** 31; return rng / 2 ** 31; };
+    const deck = () => {
+      const colors = ['W', 'U', 'B', 'R', 'G'].sort(() => r() - 0.5).slice(0, 2);
+      const lands = basics.filter((c) => (c.produced ?? []).some((x) => colors.includes(x)));
+      const ok = spells.filter((c) => (c.colors ?? []).every((x) => colors.includes(x)));
+      const list = [];
+      for (let i = 0; i < 36; i++) list.push({ card: ok[Math.floor(r() * ok.length)], qty: 1 });
+      for (let i = 0; i < 24; i++) list.push({ card: lands[i % lands.length], qty: 1 });
+      return list;
+    };
+    let finished = 0;
+    for (let g = 0; g < games; g++) {
+      const G = Engine.create({ players: [{ name: 'A', deck: deck() }, { name: 'B', deck: deck() }], first: g % 2, seed: g + 1 });
+      let n = 0;
+      for (; n < 6000 && G.winner == null && G.turn < 60; n++) {
+        const need = Engine.needs(G);
+        if (!need) throw new Error(`game ${g}: nobody to act (step ${G.step})`);
+        const a = AI.decide(G, need.player);
+        const res = Engine.perform(G, need.player, a);
+        if (!res.ok) {
+          const names = [a.id, ...(a.targets ?? []).map((t) => t?.obj ?? t?.grave)].filter((x) => x != null).map((x) => G.objects[x]?.def.name);
+          throw new Error(`game ${g} turn ${G.turn}: AI action ${JSON.stringify(a).slice(0, 160)} [${names.join(' → ')}] failed: ${res.error} (pending ${need.type})`);
+        }
+      }
+      if (G.winner != null || G.turn >= 60) finished++;
+    }
+    console.log(`  ${finished}/${games} games finished`);
+    assert.equal(finished, games);
+  };
+}
+
 let failed = 0;
 for (const [name, fn] of Object.entries(tests)) {
   try { fn(); console.log(`ok   ${name}`); } catch (e) { failed++; console.log(`FAIL ${name}\n     ${e.stack.split('\n').slice(0, 3).join('\n     ')}`); }

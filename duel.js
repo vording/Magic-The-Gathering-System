@@ -187,16 +187,52 @@ function onHandClick(id) {
   startCast(id);
 }
 
-function startCast(id, { flashback = false } = {}) {
-  const info = Engine.castInfo(G, ME, id, { flashback });
+function startCast(id, { flashback = false, mode = null } = {}) {
+  let info = Engine.castInfo(G, ME, id, { flashback, mode });
   if (!info.ok) return toast(info.reason);
+  const o = G.objects[id];
+  // モードを選ぶ呪文
+  if (info.needMode) {
+    const labels = modeLabels(o);
+    return showMenu(o.def.modes.map((_, i) => [`${labels[i] ?? `モード${i + 1}`}${info.okModes[i] ? '' : '（唱えられません）'}`,
+      () => (info.okModes[i] ? startCast(id, { flashback, mode: i }) : toast('このモードでは唱えられません'))]), lastPoint.x, lastPoint.y, o);
+  }
+  // キッカー
+  let kicked = false;
+  if (info.canKick && confirm(`キッカー（${info.kicker}）を支払いますか？`)) {
+    kicked = true;
+    info = Engine.castInfo(G, ME, id, { flashback, mode, kicked });
+  }
+  // 追加のコスト：生け贄に捧げるもの・捨てるカード
+  const extra = {};
+  const ac = info.addCost;
+  if (ac?.sacType && !ui.costPick) {
+    const opts = G.battlefield.filter((b) => G.objects[b].controller === ME && (G.objects[b].def.types.includes(ac.sacType) || G.objects[b].def.subtypes.some((t) => t.toLowerCase() === ac.sacType)));
+    if (opts.length > 1) {
+      return showMenu(opts.map((b) => [`生け贄：${G.objects[b].card.name}`, () => { ui.costPick = { sacrifice: b }; startCast(id, { flashback, mode }); }]), lastPoint.x, lastPoint.y, o);
+    }
+  }
+  if (ac?.discard && !ui.costPick) {
+    const opts = G.players[ME].hand.filter((h) => h !== id);
+    if (opts.length > 1) {
+      return showMenu(opts.map((h) => [`捨てる：${G.objects[h].card.name}`, () => { ui.costPick = { discard: h }; startCast(id, { flashback, mode }); }]), lastPoint.x, lastPoint.y, o);
+    }
+  }
+  Object.assign(extra, ui.costPick ?? {});
+  ui.costPick = null;
   let x = 0;
   if (info.x) {
     const v = prompt(`X の値（最大 ${info.maxX}）`, String(info.maxX));
     if (v === null) return;
     x = Math.max(0, Math.min(info.maxX, Number.parseInt(v, 10) || 0));
   }
-  beginTargeting({ kind: 'cast', id, specs: info.specs, x, flashback, srcColors: G.objects[id].def.colors });
+  beginTargeting({ kind: 'cast', id, specs: info.specs, x, flashback, mode, kicked, ...extra, srcColors: G.objects[id].def.colors });
+}
+
+// モードの説明（日本語の効果テキストの「•」の行。なければ英語）
+function modeLabels(o) {
+  const ja = (o.card.text ?? '').split('\n').filter((l) => l.trim().startsWith('•')).map((l) => l.replace(/^\s*•\s*/, ''));
+  return ja.length === o.def.modes.length ? ja : o.def.modes.map((m, i) => `モード${i + 1}`);
 }
 
 function startActivate(id, index) {
@@ -240,7 +276,7 @@ function nextTarget() {
     return;
   }
   ui.targeting = null;
-  if (t.kind === 'cast') act(ME, { type: 'cast', id: t.id, targets: t.targets, x: t.x, flashback: t.flashback });
+  if (t.kind === 'cast') act(ME, { type: 'cast', id: t.id, targets: t.targets, x: t.x, flashback: t.flashback, mode: t.mode, kicked: t.kicked, sacrifice: t.sacrifice, discard: t.discard });
   else act(ME, { type: 'activate', id: t.id, index: t.index, targets: t.targets, x: t.x, discard: t.discard });
 }
 
@@ -277,6 +313,7 @@ function cancelTargeting() {
 function onPermanentClick(id, e) {
   const n = Engine.needs(G);
   if (isCand({ obj: id })) return pickTarget({ obj: id });
+  if (n?.player === ME && n.type === 'sacrifice' && n.pending.options.includes(id)) return togglePick(id, n.pending.n);
   const o = G.objects[id];
   if (n?.player === ME && n.type === 'attackers' && o.controller === ME) {
     if (!Engine.canAttack(G, id)) return toast(Engine.isSick(G, id) ? `${o.card.name}は召喚酔いです` : `${o.card.name}は攻撃できません`);
@@ -433,6 +470,11 @@ function hintText(n) {
     case 'triggerTarget': return `${n.pending.name}の誘発型能力の対象を選んでください。`;
     case 'discard': return `捨てるカードを手札から${n.pending.n}枚選んでください（${n.pending.reason}）。`;
     case 'search': return 'ライブラリーから探すカードを選んでください。';
+    case 'sacrifice': return `生け贄に捧げるものを${n.pending.n}つ選んでください（${n.pending.reason}）。`;
+    case 'chooseHand': return `${n.pending.reason}：捨てさせるカードを選んでください。`;
+    case 'scry': return '占術：ライブラリーの一番下に置くカードを選んで「決定」（選ばなかったものは上に残る）。';
+    case 'lookPick': return '手札に加えるカードを1枚選んでください。';
+    case 'reorder': return 'ライブラリーの一番上から並べる順にカードを選んで「決定」。';
     case 'payOrNot': return `${n.pending.reason}：${n.pending.cost}を支払いますか？`;
     default: {
       const top = G.stack.at(-1);
@@ -492,6 +534,7 @@ function cardEl(id, zone = 'battlefield') {
     if (ui.blockSel === id) el.classList.add('block-select');
     if (ui.blockSel != null && o.attacking && Engine.canBlock(G, ui.blockSel, id)) el.classList.add('block-target');
     if (isCand({ obj: id })) el.classList.add('targetable');
+    if (n?.player === ME && n.type === 'sacrifice' && n.pending.options.includes(id)) el.classList.add(ui.picks.has(id) ? 'picked' : 'selectable');
     el.addEventListener('click', (e) => onPermanentClick(id, e));
   } else if (zone === 'hand') {
     const n = Engine.needs(G);
@@ -502,9 +545,14 @@ function cardEl(id, zone = 'battlefield') {
     el.addEventListener('click', () => (phone() && n?.type === 'priority' ? openCardMenu(id, 0, 0) : onHandClick(id)));
   } else {
     if (isCand({ grave: id })) el.classList.add('targetable');
+    if (viewerState?.multi && ui.picks.has(id)) {
+      el.classList.add('picked');
+      badge('counter', String([...ui.picks].indexOf(id) + 1));
+    }
     el.addEventListener('click', (e) => {
       if (isCand({ grave: id })) { closeViewer(); return pickTarget({ grave: id }); }
       if (viewerState?.choose) return chooseFromViewer(id);
+      if (viewerState?.multi) { if (ui.picks.has(id)) ui.picks.delete(id); else ui.picks.add(id); Sound.play('button'); return render(); }
       if (o.owner === ME && o.def.flashback) openCardMenu(id, e.clientX, e.clientY);
       else if (phone()) showDetail(id);
     });
@@ -602,6 +650,21 @@ function renderBanner(n) {
         button(`ブロックを確定（${Object.keys(ui.blocks).length}体）`, () => act(ME, { type: 'blockers', blocks: ui.blocks }), true));
     case 'payOrNot':
       return show(span(`${p.reason}`), button(`${p.cost}を支払う`, () => act(ME, { type: 'pay', yes: true }), true, !p.canPay), button('支払わない', () => act(ME, { type: 'pay', yes: false })));
+    case 'sacrifice':
+      return show(span(`${p.reason}：生け贄に捧げるものをクリック（${ui.picks.size}/${p.n}）`), button('決定', () => act(ME, { type: 'choose', ids: [...ui.picks] }), true, ui.picks.size !== p.n));
+    case 'chooseHand':
+      openViewer({ title: `${G.players[p.from].name}の手札`, ids: p.options, hint: '捨てさせるカードをクリック', choose: true });
+      return show(span(`${p.reason}：捨てさせるカードを選んでください`), button('一覧を開く', () => openViewer({ title: `${G.players[p.from].name}の手札`, ids: p.options, hint: '捨てさせるカードをクリック', choose: true })));
+    case 'lookPick':
+      openViewer({ title: 'ライブラリーの上のカード', ids: p.options, hint: '手札に加えるカードをクリック', choose: true });
+      return show(span('手札に加えるカードを選んでください'), button('一覧を開く', () => openViewer({ title: 'ライブラリーの上のカード', ids: p.options, hint: '手札に加えるカードをクリック', choose: true })));
+    case 'scry':
+    case 'reorder': {
+      const title = n.type === 'scry' ? '占術' : '並べ替え';
+      const hint = n.type === 'scry' ? '一番下に置くカードをクリック（もう一度で取り消し）' : '一番上に置く順にクリック';
+      openViewer({ title, ids: p.options, hint, multi: true });
+      return show(span(`${title}：${ui.picks.size}枚選択`), button('一覧を開く', () => openViewer({ title, ids: p.options, hint, multi: true })), button('決定', () => { closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); }, true));
+    }
     case 'search':
       openViewer({ title: 'ライブラリーから選ぶ', ids: p.options, hint: 'カードをクリックして選ぶ', choose: true });
       return show(span('ライブラリーから探すカードを選んでください'), button('一覧を開く', () => openViewer({ title: 'ライブラリーから選ぶ', ids: p.options, hint: 'カードをクリックして選ぶ', choose: true })));
@@ -652,7 +715,9 @@ function renderViewer() {
   const ids = viewerState.zone ? G.players[viewerState.player][viewerState.zone] : viewerState.ids;
   $('viewer-title').textContent = `${viewerState.title}（${ids.length}枚）`;
   $('viewer-hint').textContent = viewerState.hint ?? '';
-  $('viewer-cards').replaceChildren(...[...ids].reverse().map((id) => cardEl(id, 'viewer')));
+  // 墓地・追放は新しいものから。ライブラリーの上のカードは上から順に
+  const list = viewerState.zone ? [...ids].reverse() : ids;
+  $('viewer-cards').replaceChildren(...list.map((id) => cardEl(id, 'viewer')));
 }
 function closeViewer() {
   viewerState = null;
@@ -746,7 +811,11 @@ function updateSupport() {
   const box = $('setup-support');
   box.replaceChildren();
   if (!deck) return;
-  const rows = Object.values(deck.cards).map(({ card, qty }) => ({ card, qty, def: CardText.compile(card) }));
+  const rows = Object.values(deck.cards).map(({ card, qty }) => {
+    const def = CardText.compile(card);
+    if (Engine.unsupported(def).length && def.support === 'full') def.support = 'partial';
+    return { card, qty, def };
+  });
   const count = (s) => rows.filter((r) => r.def.support === s).reduce((n, r) => n + r.qty, 0);
   const total = rows.reduce((n, r) => n + r.qty, 0);
   const head = Object.assign(document.createElement('div'), {
