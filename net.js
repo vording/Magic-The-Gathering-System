@@ -3,7 +3,6 @@
 // URL に ?local=1 を付けると、同じPCの別タブ同士を BroadcastChannel でつなぐ（動作確認用）。
 //
 // 使い方: Net.on('open' | 'close' | 'status' | <メッセージの type>, fn)、Net.host(code)、Net.join(code)、Net.send(msg)
-// Net.cpu(Cpu) で CPU対戦（cpu.js）につなぐ
 
 const Net = (() => {
   const PREFIX = 'mtgdm-';
@@ -142,33 +141,6 @@ const Net = (() => {
     bc.postMessage({ type: '_ping', _from: me });
   }
 
-  // ---------- CPU対戦（同じページの中の相手） ----------
-  // bot: { connect(sendFn), receive(msg), disconnect() }（cpu.js の Cpu）。
-  // 部屋を作った側（host）として振る舞い、メッセージは非同期で受け渡す（ネット対戦と同じ順番・タイミングの性質にする）
-
-  let cpuBot = null;
-  const copy = (m) => JSON.parse(JSON.stringify(m));
-
-  function startCpu(bot) {
-    stop();
-    stopped = false;
-    role = 'host';
-    code = 'CPU';
-    cpuBot = bot;
-    const entry = {
-      open: true,
-      send: (m) => { const c = copy(m); setTimeout(() => conn === entry && bot.receive(c), 0); },
-      close: () => bot.disconnect(),
-    };
-    conn = entry;
-    bot.connect((m) => {
-      const c = copy(m);
-      setTimeout(() => conn === entry && c && typeof c.type === 'string' && emit(c.type, c), 0);
-    });
-    status('CPU対戦', 'ok');
-    setTimeout(() => conn === entry && emit('open'), 0);
-  }
-
   // ---------- 開始・終了 ----------
 
   function start(r, c) {
@@ -196,7 +168,6 @@ const Net = (() => {
     peer = null;
     role = null;
     code = null;
-    cpuBot = null;
   }
 
   return {
@@ -207,8 +178,6 @@ const Net = (() => {
     host: (c = newCode()) => start('host', c),
     join: (c) => start('guest', c.trim().toUpperCase()),
     stop,
-    cpu: (bot) => startCpu(bot),
-    get isCpu() { return !!cpuBot; },
     get role() { return role; },
     get code() { return code; },
     get active() { return !!role; },

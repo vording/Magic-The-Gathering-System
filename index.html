@@ -6,7 +6,7 @@
   <title>Magic: The Gathering System</title>
   <link rel="stylesheet" href="theme.css?v=24">
   <link rel="stylesheet" href="style.css?v=28">
-  <script src="i18n.js?v=16"></script>
+  <script src="i18n.js?v=17"></script>
   <script src="device.js?v=1"></script>
   <script src="zoom.js?v=2"></script>
 </head>
@@ -56,6 +56,7 @@
               <button id="deck-delete">削除</button>
             </div>
             <button id="deck-play" class="primary play-btn">一人回し ▶</button>
+            <button id="deck-duel" class="primary play-btn" title="ルールどおりに自動で進む対戦（CPU・練習相手）">ルール対戦 ▶</button>
           </div>
           <ul id="warnings" class="warnings"></ul>
           <h3 class="section-title">マナカーブ</h3>
@@ -86,6 +87,7 @@
     <nav class="bottombar">
       <span class="active">デッキ作成</span>
       <a href="play.html">一人回し・対戦</a>
+      <a href="duel.html">ルール対戦</a>
     </nav>
   </div>
 
@@ -129,6 +131,6 @@
     </form>
   </dialog>
 
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>

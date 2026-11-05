@@ -1,4 +1,4 @@
-// Magic: The Gathering System — 一人回し／ネット対戦／CPU対戦（MTGO風）
+// Magic: The Gathering System — 一人回し／ネット対戦（MTGO風）。CPU対戦・ルールどおりの自動進行は duel.html（ルール対戦）
 // ルール処理は基本的に手動。「自動処理」がオンなら、rules.js で読み取れるカードはマナの支払い・効果の解決を自動で行う。
 // 自分のゲーム状態はすべて `game` に持ち、変更は act() を通して行う（元に戻すのため）。
 // ネット対戦では、描画のたびに自分の公開情報（snapshot）を相手に送り、相手の公開情報を `opp` に受け取る。
@@ -14,7 +14,6 @@ const CHAT_KEY = 'mtg-deckmaker-chat';
 const NAME_KEY = 'mtg-deckmaker-name';
 const AVATAR_KEY = 'mtg-deckmaker-avatar';
 const AUTO_KEY = 'mtg-deckmaker-auto';
-const CPU_DECK_KEY = 'mtg-deckmaker-cpu-deck';
 // アバター（img/avatar/1.jpg〜18.jpg）
 const AVATARS = Array.from({ length: 18 }, (_, i) => String(i + 1));
 const avatarImage = (a) => `url("img/avatar/${a}.jpg")`;
@@ -86,6 +85,7 @@ let opp = null;
 let chat = loadJson(sessionStorage, CHAT_KEY) ?? [];
 // 接続情報 { role: 'host' | 'guest', code }（再読み込みしても同じ部屋に戻る）
 let netInfo = loadJson(sessionStorage, NET_KEY);
+if (netInfo?.role === 'cpu') netInfo = null; // 以前の CPU対戦（ルール対戦に移った）
 // 部屋に入る側：部屋を作った側から届いた最新のゲーム { onDraw: 作った側が後手か, matchId }
 let pendingHost = null;
 // 部屋に入る側：まだ合わせていない新しいゲームのターンが先に届いた場合の matchId
@@ -2008,14 +2008,10 @@ function openSetup() {
   }));
   const requested = Number(new URLSearchParams(location.search).get('deck'));
   select.value = String(requested || game?.deckId || decks[0]?.id || '');
-  // CPU のデッキ（前回選んだもの → なければ自分と同じ）
-  $('setup-cpu-deck').replaceChildren(...[...select.options].map((o) => new Option(o.text, o.value)));
-  const cpuDeck = loadJson(localStorage, CPU_DECK_KEY);
-  $('setup-cpu-deck').value = String(decks.some((d) => d.id === cpuDeck) ? cpuDeck : select.value);
   $('setup-error').textContent = decks.length ? '' : 'デッキがありません。デッキ作成画面で作ってください。';
   $('player-name').value = myName();
   $('setup-form').elements.avatar.value = myAvatar();
-  const mode = { host: 'host', guest: 'join', cpu: 'cpu' }[netInfo?.role] ?? 'solo';
+  const mode = { host: 'host', guest: 'join' }[netInfo?.role] ?? 'solo';
   $('setup-form').elements.mode.value = mode;
   $('room-code').value = netInfo?.role === 'guest' ? netInfo.code : '';
   updateSetupMode();
@@ -2027,7 +2023,6 @@ function updateSetupMode() {
   $('room-code').disabled = mode !== 'join';
   for (const r of $('setup-form').elements.order) r.disabled = mode === 'join';
   $('order-note').hidden = mode !== 'join';
-  $('cpu-deck-field').hidden = mode !== 'cpu';
 }
 
 function startFromSetup(e) {
@@ -2054,27 +2049,12 @@ function startFromSetup(e) {
     return;
   }
 
-  const cpuDeck = mode === 'cpu' ? decks.find((d) => d.id === Number($('setup-cpu-deck').value)) : null;
-  if (mode === 'cpu' && (!cpuDeck || Object.values(cpuDeck.cards).reduce((sum, x) => sum + x.qty, 0) < 7)) {
-    $('setup-error').textContent = 'CPU のデッキに7枚以上のカードが必要です。';
-    return;
-  }
-
   // 接続の開始・切り替え（同じ部屋のままなら接続を保つ）
-  if (mode === 'cpu') {
-    // CPU対戦：毎回新しい CPU とつなぐ（部屋を作った側として対戦する）
-    Net.stop();
-    opp = null;
-    chat = [];
-    saveJson(localStorage, CPU_DECK_KEY, cpuDeck.id);
-    Cpu.setup({ deck: cpuDeck, cardFrom, fresh: true });
-    netInfo = { role: 'cpu' };
-    Net.cpu(Cpu);
-  } else if (mode === 'solo') {
+  if (mode === 'solo') {
     Net.stop();
     netInfo = null;
     opp = null;
-  } else if (mode === 'host' && !(Net.role === 'host' && !Net.isCpu)) {
+  } else if (mode === 'host' && !(Net.role === 'host')) {
     Net.stop();
     opp = null;
     chat = [];
@@ -2237,10 +2217,7 @@ function init() {
   // 再読み込みしたら同じ部屋に戻る
   if (netInfo?.role === 'host') Net.host(netInfo.code);
   else if (netInfo?.role === 'guest') Net.join(netInfo.code);
-  else if (netInfo?.role === 'cpu') {
-    Cpu.setup({ cardFrom });
-    Net.cpu(Cpu);
-  }
+
 
   const requested = Number(new URLSearchParams(location.search).get('deck'));
   if (game && (!requested || requested === game.deckId)) render();

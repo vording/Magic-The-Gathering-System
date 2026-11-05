@@ -1018,6 +1018,9 @@ function init() {
   $('deck-play').addEventListener('click', () => {
     location.href = `play.html?deck=${activeDeck().id}`;
   });
+  $('deck-duel').addEventListener('click', () => {
+    location.href = `duel.html?deck=${activeDeck().id}`;
+  });
 
   const jaToggle = $('ja');
   jaToggle.checked = state.ja;

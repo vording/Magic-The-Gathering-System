@@ -80,6 +80,55 @@
     '上から墓地へ': 'Mill', 'すべてアンタップ': 'Untap all', 'トークンを出す': 'Create token',
     '手札: ダブルクリックで戦場へ': 'Hand: double-click to put onto the battlefield',
     '手札: ダブルクリックで唱える（自動処理オフなら戦場へ）': 'Hand: double-click to cast (onto the battlefield when auto rules are off)',
+    // ルール対戦（duel.html）
+    'ルール対戦': 'Rules Match', 'ルール対戦の開始': 'Start a Rules Match', 'ルール対戦 ▶': 'Rules Match ▶',
+    'ルールどおりに自動で進む対戦（CPU・練習相手）': 'A match that follows the rules automatically (CPU / practice opponent)',
+    'カードの効果テキストを読み取って、ルールどおりに自動で進めます（スタック・優先権・打ち消し・誘発型能力など）。読み取れない効果はログに表示されます。':
+      'Card text is read and the game runs by the rules automatically (stack, priority, counterspells, triggered abilities, …). Effects that can\'t be read are shown in the log.',
+    'CPU対戦・ルールどおりに自動で進む対戦は': 'For CPU matches and matches that follow the rules automatically, go to', 'へ': '',
+    '相手': 'Opponent', 'CPU': 'CPU', '練習相手（何もしない）': 'Practice opponent (does nothing)', '練習相手': 'Practice opponent',
+    'パス': 'Pass', '解決する（パス）': 'Resolve (pass)', '戦闘へ（パス）': 'To combat (pass)', 'ターン終了（パス）': 'End turn (pass)',
+    'ターン終了まで': 'Pass until end of turn', 'Enter：相手が何かするか、自分の次のターンまで自動でパス': 'Enter: pass automatically until the opponent does something or the turn ends',
+    'スタック': 'Stack', 'マナ・プール': 'Mana pool', '先制攻撃ダメージ': 'First-strike damage',
+    'すべてのステップで止まる：オン': 'Stop at every step: On', 'すべてのステップで止まる：オフ': 'Stop at every step: Off',
+    'オンにすると、自分が何もできないステップでも止まる': 'When on, also stop at steps where you can\'t do anything',
+    '手動で遊ぶ（一人回し・ネット対戦）': 'Play manually (solo / online)',
+    '手札: クリックで土地をプレイ・呪文を唱える': 'Hand: click to play a land or cast a spell',
+    '戦場: クリックで能力を起動（攻撃・ブロックの指定中は選ぶ）': 'Battlefield: click to activate an ability (or select attackers / blockers)',
+    '右クリック／長押しで詳細・メニュー': 'Right-click / long-press for details and menu', 'マナは自動で支払われます': 'Mana is paid automatically',
+    '墓地：クリックで一覧（フラッシュバックもここから）': 'Graveyard: click to view (flashback from here)',
+    '攻撃するクリーチャーをクリック': 'Click creatures to attack with', '攻撃しない': 'No attack', '全員で攻撃': 'Attack with all', '攻撃を確定': 'Confirm attack', 'ブロックしない': 'No blocks', '選ばない': "Don't choose",
+    '決定': 'OK', '捨てる': 'Discard', '一覧を開く': 'Open list', 'ライブラリーから選ぶ': 'Choose from library', 'カードをクリックして選ぶ': 'Click a card to choose it',
+    'ライブラリーから探すカードを選んでください': 'Choose a card to search for', 'フラッシュバックを持つカードはクリックで唱えられます': 'Click a card with flashback to cast it',
+    '墓地から対象を選ぶ': 'Choose a target from a graveyard', '詳しく見る': 'Details', '唱える': 'Cast', '土地をプレイする': 'Play land',
+    '今は唱えられません': "You can't cast spells now", '部屋を作った人の開始を待っています': 'Waiting for the room creator to start',
+    'デッキに7枚以上のカードが必要です。': 'The deck needs at least 7 cards.', '対象を選んでください（Esc で取り消し）。': 'Choose a target (Esc to cancel).',
+    '初手を確認して、キープかマリガンを選んでください。': 'Check your opening hand, then keep or mulligan.',
+    '攻撃するクリーチャーをクリックして「攻撃を確定」を押してください。': 'Click creatures to attack with, then press "Confirm attack".',
+    'ブロック：自分のクリーチャー → 相手の攻撃クリーチャーの順にクリックしてください。': 'Block: click your creature, then an attacking creature.',
+    'ブロック：自分のクリーチャー → 相手の攻撃クリーチャー': 'Block: your creature → an attacking creature',
+    'ライブラリーから探すカードを選んでください。': 'Choose a card to search for.', '勝利しました。': 'You won.', '敗北しました。': 'You lost.',
+    '第1メイン・フェイズ。土地をプレイしたり、呪文を唱えたりできます。「パス」で戦闘へ。': 'Main phase 1. Play a land or cast spells. "Pass" goes to combat.',
+    '第2メイン・フェイズ。「パス」でターンを終えます。': 'Main phase 2. "Pass" ends your turn.',
+    '攻撃クリーチャー指定ステップ。': 'Declare attackers step.', 'ブロック・クリーチャー指定ステップ。': 'Declare blockers step.',
+    '先制攻撃の戦闘ダメージ・ステップ。': 'First-strike combat damage step.', '戦闘ダメージ・ステップ。': 'Combat damage step.', '戦闘終了ステップ。': 'End of combat step.',
+    '終了ステップ。': 'End step.', 'アンタップ・ステップ。': 'Untap step.', 'アップキープ・ステップ。': 'Upkeep step.', 'ドロー・ステップ。': 'Draw step.',
+    '戦闘開始ステップ。': 'Beginning of combat step.', 'クリーンアップ・ステップ。': 'Cleanup step.',
+    'ブロックしない（ログ）': 'No blocks', '戦闘ダメージはすべて軽減された': 'All combat damage was prevented', '探したが見つからなかった': 'Searched but found nothing',
+    // エンジンの理由
+    '優先権がありません': "You don't have priority", 'マナが足りません': 'Not enough mana', '手札にありません': 'Not in your hand', '土地は唱えられません': "Lands can't be cast",
+    'ソーサリーを唱えられるときだけ起動できます': 'Activate only as a sorcery', 'このターンはもう起動しました': 'Already activated this turn',
+    'タップしています': "It's tapped", '召喚酔いです': 'Summoning sick', 'ライフが足りません': 'Not enough life', '捨てるカードがありません': 'No card to discard',
+    'カウンターがありません': 'No counter to remove', '生け贄に捧げるものがありません': 'Nothing to sacrifice', '対象がありません': 'No legal targets',
+    '能力がありません': 'No such ability', '手札から起動します': 'Activate it from your hand', '戦場にありません': 'Not on the battlefield',
+    '相手の選択を待っています': 'Waiting for the opponent\'s choice', '先に選択をしてください': 'Make the current choice first', 'ゲームは終わっています': 'The game is over',
+    '対象を選んでください': 'Choose a target', 'その対象は選べません': "That target can't be chosen",
+    '土地は自分のメイン・フェイズ（スタックが空のとき）にプレイできます': 'Lands can be played during your main phase when the stack is empty',
+    'このターンはもう土地をプレイしました': 'You already played a land this turn', '手札の土地を選んでください': 'Choose a land in your hand',
+    'キープかマリガンを選んでください': 'Keep or mulligan', 'これ以上マリガンできません': "You can't mulligan any more",
+    '攻撃するクリーチャーを決めてください': 'Declare attackers', 'ブロックを決めてください': 'Declare blockers', 'カードを選んでください': 'Choose a card',
+    '支払うかどうかを選んでください': 'Choose whether to pay', 'いまはできません': "You can't do that now", '自分のクリーチャーでブロックしてください': 'Block with your own creatures',
+    '自分のカードではありません': "It isn't your card", '手札の上限': 'maximum hand size',
     // CPU対戦・自動処理
     'CPU対戦': 'vs CPU', 'CPUのデッキ': 'CPU deck', 'CPU のデッキに7枚以上のカードが必要です。': 'The CPU deck needs at least 7 cards.',
     '自動処理：オン': 'Auto rules: On', '自動処理：オフ': 'Auto rules: Off',
@@ -149,6 +198,15 @@
   }));
 
   const T = (s) => EXACT.get(s) ?? s;
+  // 「（X=3）（フラッシュバック）（対象：A、B）（Mountainをタップ）」
+  const castNotes = (rest) => [...rest.matchAll(/（([^（）]*)）/g)].map(([, x]) => {
+    let m;
+    if ((m = /^X=(\d+)$/.exec(x))) return ` (X=${m[1]})`;
+    if (x === 'フラッシュバック') return ' (flashback)';
+    if ((m = /^対象：(.+)$/.exec(x))) return ` (targeting ${list(m[1])})`;
+    if ((m = /^(.+)をタップ$/.exec(x))) return ` (tapped ${list(m[1])})`;
+    return ` (${x})`;
+  }).join('');
   // 効果の出どころ（「相手のLightning Bolt」「CPUのShock」）
   const src = (s) => (s.startsWith('相手の') ? `Opponent's ${s.slice(3)}` : s.replace(/^(.+?)の(.+)$/, (_, p, c) => `${T(p)}'s ${c}`));
   // 効果の説明（rules.js の describe）
@@ -167,8 +225,66 @@
 
   // ---------- 訳語（文の形） ----------
   const PATTERNS = [
+    // ルール対戦
+    [/^(.+)を唱えた((?:（[^（）]*）)*)$/, (_, c, rest) => `Cast ${c}${castNotes(rest)}`],
+    [/^ゲーム開始（(.+)が先手）$/, (_, p) => `Game start (${T(p)} goes first)`],
+    [/^(.+)をプレイした$/, (_, c) => `Played ${c}`],
+    [/^(.+)の能力を起動(?:（対象：(.+)）)?$/, (_, c, t) => `Activated ${c}'s ability${t ? ` (targeting ${list(t)})` : ''}`],
+    [/^(.+)の誘発型能力：対象がないので何もしない$/, (_, c) => `${c}'s triggered ability: no targets, does nothing`],
+    [/^(.+)の誘発型能力の対象を選んでください。$/, (_, c) => `Choose a target for ${c}'s triggered ability.`],
+    [/^(.+)の誘発型能力$/, (_, c) => `${c}'s triggered ability`],
+    [/^(.+)が戦場に出た(?:（(.+)につけた）)?$/, (_, c, t) => `${c} entered the battlefield${t ? ` (attached to ${t})` : ''}`],
+    [/^(.+)は対象が不適正になったので打ち消された$/, (_, c) => `${c} was countered (its targets became illegal)`],
+    [/^(.+)は(.+)で打ち消された$/, (_, c, by) => `${c} was countered by ${by}`],
+    [/^(.+)は再生した$/, (_, c) => `${c} regenerated`],
+    [/^(.+?)：(.+)に再生の盾$/, (_, s, c) => `${src(s)}: regeneration shield on ${c}`],
+    [/^戦闘で(\d+)点のダメージを受けた（ライフ (-?\d+)）$/, (_, n, l) => `Took ${n} combat damage (life ${l})`],
+    [/^(.+?)：このターンの戦闘ダメージをすべて軽減する$/, (_, s) => `${src(s)}: prevent all combat damage this turn`],
+    [/^(.+)をサイクリングした$/, (_, c) => `Cycled ${c}`],
+    [/^(.+)を(.+)につけた$/, (_, a, c) => `Attached ${a} to ${c}`],
+    [/^(.+)（支払わなければ(.+)は打ち消される）：(.+)を支払った$/, (_, s, c, m) => `${s}: paid ${m} (or ${c} would be countered)`],
+    [/^(.+)：(\{.+\})を支払った$/, (_, s, m) => `${translate(s)}: paid ${m}`],
+    [/^(.+)：支払わなかったので生け贄に捧げた$/, (_, s) => `${translate(s)}: not paid, sacrificed`],
+    [/^(.+)（支払わなければ(.+)は打ち消される）$/, (_, s, c) => `${s} (if not paid, ${c} is countered)`],
+    [/^(.+)のエコー$/, (_, c) => `Echo of ${c}`],
+    [/^(.+)：(.+)を支払いますか？$/, (_, s, m) => `${translate(s)}: pay ${m}?`],
+    [/^(.+)を支払う$/, (_, m) => `Pay ${m}`],
+    [/^手札から(\d+)枚をライブラリーの一番下へ$/, (_, n) => `Put ${cards(n)} from the hand on the bottom of the library`],
+    [/^ターン (\d+)（(.+)）$/, (_, n, p) => `Turn ${n} (${T(p)})`],
+    [new RegExp(`^(.+)：ターン(\\d+)・(.+?)(（考え中）|（操作中）)?$`), (_, p, n, ph, x) => `${T(p)}: Turn ${n} · ${T(ph)}${x ? (x === '（考え中）' ? ' (thinking)' : ' (acting)') : ''}`],
+    [/^(.+)：待機中(（考え中）|（操作中）)?$/, (_, p, x) => `${T(p)}: waiting${x ? (x === '（考え中）' ? ' (thinking)' : ' (acting)') : ''}`],
+    [/^(.+)が考えています…$/, (_, p) => `${T(p)} is thinking…`],
+    [/^(.+)の操作を待っています…$/, (_, p) => `Waiting for ${T(p)}…`],
+    [/^ライブラリーの一番下に置くカードを選択（(\d+)\/(\d+)）$/, (_, a, b) => `Choose cards for the bottom of the library (${a}/${b})`],
+    [/^ライブラリーの一番下に置くカードを手札から(\d+)枚選んでください。$/, (_, n) => `Choose ${cards(n)} from your hand to put on the bottom of your library.`],
+    [/^(.+)：捨てるカードを選択（(\d+)\/(\d+)）$/, (_, r, a, b) => `${T(r)}: choose cards to discard (${a}/${b})`],
+    [/^捨てるカードを手札から(\d+)枚選んでください（(.+)）。$/, (_, n, r) => `Choose ${cards(n)} to discard (${T(r)}).`],
+    [/^攻撃：(\d+)体$/, (_, n) => `Attacking: ${n}`],
+    [/^ブロックを確定（(\d+)体）$/, (_, n) => `Confirm blocks (${n})`],
+    [/^(.+)でブロックする攻撃クリーチャーをクリック$/, (_, c) => `Click the attacking creature to block with ${c}`],
+    [/^キープすると、手札から(\d+)枚をライブラリーの一番下に置きます$/, (_, n) => `If you keep, put ${cards(n)} from your hand on the bottom of your library`],
+    [/^(.+)がスタックにあります。対応するならインスタントや能力を使い、しないなら「パス」。$/, (_, c) => `${c} is on the stack. Respond with an instant or ability, or "Pass".`],
+    [/^自動で処理できるカード：(\d+)\/(\d+)枚（一部だけ (\d+)枚・できない (\d+)枚）$/, (_, a, b, c, d) => `Cards handled automatically: ${a}/${b} (partly: ${c}, not at all: ${d})`],
+    [/^(.+)は召喚酔いです$/, (_, c) => `${c} is summoning sick`],
+    [/^(.+)は攻撃できません$/, (_, c) => `${c} can't attack`],
+    [/^(.+)は(.+)をブロックできません$/, (_, a, b) => `${a} can't block ${b}`],
+    [/^(.+)は威迫を持っています（2体以上でブロック）$/, (_, c) => `${c} has menace (block it with two or more creatures)`],
+    [/^(.+)は自分のメイン・フェイズ（スタックが空のとき）にしか唱えられません$/, (_, c) => `${c} can only be cast during your main phase when the stack is empty`],
+    [/^マナが足りません（(.+)）$/, (_, m) => `Not enough mana (${m})`],
+    [/^手札から(\d+)枚選んでください$/, (_, n) => `Choose ${cards(n)} from your hand`],
+    [/^フラッシュバック（(.+)）$/, (_, m) => `Flashback (${m})`],
+    [/^サイクリング（(.+)）$/, (_, m) => `Cycling (${m})`],
+    [/^マナを出す：(.+)$/, (_, t) => `Add mana: ${t}`],
+    [/^起動：(.+?)(?:（(.+)）)?$/, (_, t, r) => `Activate: ${t}${r ? ` (${translate(r)})` : ''}`],
+    [/^\{(.)\} を出す$/, (_, c) => `Add {${c}}`],
+    [/^得ている能力：(.+)$/, (_, k) => `Gained: ${list(k)}`],
+    [/^※自動で処理できない効果：(.+)$/, (_, t) => `* Not handled automatically: ${t}`],
+    [/^再生×(\d+)$/, (_, n) => `Regen ×${n}`],
+    [/^(.+)（誘発）(.*)$/, (_, c, r) => `${c} (trigger)${r}`],
+    [/^(.+)（能力）(.*)$/, (_, c, r) => `${c} (ability)${r}`],
+    [/^Magic: The Gathering System のルール対戦の部屋コード：(.+)$/, (_, c) => `Magic: The Gathering System rules match room code: ${c}`],
+    [/^ルール対戦 — (.+)$/, (_, t) => `Rules Match — ${t}`],
     // 自動処理・CPU対戦
-    [/^(.+)を唱えた(?:（X=(\d+)）)?(?:（(.+)をタップ）)?$/, (_, c, x, t) => `Cast ${c}${x ? ` (X=${x})` : ''}${t ? ` (tapped ${list(t)})` : ''}`],
     [/^(.+)は自分のメイン・フェイズにしか唱えられません（インスタント以外）$/, (_, c) => `${c} can only be cast during your main phase (not an instant)`],
     [/^マナが足りません（(.+)）。右クリック →「マナを払わずに唱える」で手動にもできます$/, (_, m) => `Not enough mana (${m}). You can also right-click → "Cast without paying mana"`],
     [/^(.+)の対象がありません$/, (_, c) => `${c} has no legal targets`],
@@ -339,7 +455,8 @@
   const textOrig = new WeakMap(); // テキストノード → { src: 元の日本語, out: 置き換えた文字 }
   const attrOrig = new WeakMap(); // 要素 → { 属性名: { src, out } }
 
-  const skipped = (el) => !!el?.closest?.(SKIP);
+  // カードの中は名前なので訳さない（攻撃・ブロック・再生の印だけは訳す）
+  const skipped = (el) => !!el?.closest?.(SKIP) && !el.closest('.atk, .regen');
 
   function doText(node) {
     if (skipped(node.parentElement)) return;
