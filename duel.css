@@ -1,0 +1,48 @@
+/* ルール対戦の画面（play.css に足す分） */
+
+/* スタック：戦場の間に、上が最後に積まれたもの */
+.stack-panel {
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px; margin: 2px 6px;
+  background: rgba(20, 20, 30, .82); border: 1px solid #6b5a2e; border-radius: 4px; min-height: 0;
+}
+.stack-panel[hidden] { display: none; }
+.stack-label { font-size: 12px; font-weight: bold; color: #e8c66a; writing-mode: horizontal-tb; }
+.stack-items { display: flex; gap: 6px; overflow-x: auto; }
+.stack-item {
+  display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 3px;
+  background: #2b2b33; border: 1px solid #555; color: #eee; font-size: 12px; max-width: 260px;
+}
+.stack-item img { width: 34px; border-radius: 2px; }
+.stack-item.top { border-color: #e8c66a; box-shadow: 0 0 6px rgba(232, 198, 106, .6); }
+.stack-item.theirs .stack-text::before { content: "相手："; color: #ff9a8a; }
+.stack-item.mine .stack-text::before { content: "自分："; color: #9cc6ff; }
+html[lang="en"] .stack-item.theirs .stack-text::before { content: "Opp: "; }
+html[lang="en"] .stack-item.mine .stack-text::before { content: "You: "; }
+.stack-item.targetable { outline: 3px solid #ffb02e; cursor: crosshair; }
+
+/* マナ・プール */
+.pool { display: flex; gap: 3px; justify-content: center; min-height: 0; flex-wrap: wrap; }
+.pool:empty { display: none; }
+.mana { font: bold 11px/16px sans-serif; padding: 0 5px; border-radius: 8px; border: 1px solid #000; color: #111; }
+.mana-W { background: #f8f4dc; } .mana-U { background: #9cc9ef; } .mana-B { background: #a99fa0; }
+.mana-R { background: #f09477; } .mana-G { background: #9bd3ae; } .mana-C { background: #cfc9c6; }
+
+/* カードの印 */
+.card .attached, .card .regen {
+  position: absolute; left: 2px; bottom: 16px; max-width: calc(100% - 4px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 9px; line-height: 12px; padding: 0 3px; border-radius: 2px; background: rgba(0, 0, 0, .75); color: #e8c66a; pointer-events: none;
+}
+.card .regen { bottom: 30px; color: #9bd3ae; }
+.card.manual::before {
+  content: "手"; position: absolute; right: 2px; top: 2px; z-index: 2; font: bold 9px/12px sans-serif; padding: 0 2px;
+  background: #b8322a; color: #fff; border-radius: 2px; pointer-events: none;
+}
+html[lang="en"] .card.manual::before { content: "M"; }
+.card.picked { outline: 3px solid #ff5a5a; outline-offset: 2px; transform: translateY(-8px); }
+.card.back { background: repeating-linear-gradient(45deg, #3a2a1a, #3a2a1a 6px, #4a3624 6px, #4a3624 12px); }
+.card.targetable { outline: 3px solid #ffb02e; outline-offset: 2px; cursor: crosshair; box-shadow: 0 0 12px #ffb02e; }
+
+.tools .button-link { display: block; text-align: center; font-size: 12px; padding: 4px; color: inherit; }
+.support-report { font-size: 12px; max-height: 9em; overflow: auto; }
+.support-report ul { margin: 4px 0 0; padding-left: 1.2em; color: var(--muted, #888); }
+.cpu-deck-field { margin: 4px 0 4px 1.6em; }

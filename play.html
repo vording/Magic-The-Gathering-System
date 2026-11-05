@@ -6,7 +6,7 @@
   <title>一人回し・対戦 — Magic: The Gathering System</title>
   <link rel="stylesheet" href="theme.css?v=24">
   <link rel="stylesheet" href="play.css?v=42">
-  <script src="i18n.js?v=16"></script>
+  <script src="i18n.js?v=17"></script>
   <script src="device.js?v=1"></script>
   <script src="felt.js?v=7"></script>
   <script src="zoom.js?v=2"></script>
@@ -179,6 +179,7 @@
     <nav class="bottombar">
       <a href="index.html">デッキ作成</a>
       <span class="active">一人回し・対戦</span>
+      <a href="duel.html">ルール対戦</a>
     </nav>
   </div>
 
@@ -189,8 +190,7 @@
       <fieldset class="order well">
         <legend>遊び方</legend>
         <label><input type="radio" name="mode" value="solo" checked> 一人回し</label>
-        <label><input type="radio" name="mode" value="cpu"> CPU対戦</label>
-        <label class="field cpu-deck-field" id="cpu-deck-field" hidden>CPUのデッキ <select id="setup-cpu-deck"></select></label>
+        <p class="note">CPU対戦・ルールどおりに自動で進む対戦は <a href="duel.html">ルール対戦</a> へ</p>
         <label><input type="radio" name="mode" value="host"> ネット対戦：部屋を作る</label>
         <label><input type="radio" name="mode" value="join"> ネット対戦：部屋に入る
           <input id="room-code" name="room" type="text" placeholder="部屋コード" maxlength="12" class="room-code"></label>
@@ -261,9 +261,8 @@
 
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <script src="sound.js?v=2"></script>
-  <script src="net.js?v=3"></script>
-  <script src="rules.js?v=1"></script>
-  <script src="cpu.js?v=1"></script>
-  <script src="play.js?v=25"></script>
+  <script src="net.js?v=4"></script>
+  <script src="rules.js?v=2"></script>
+  <script src="play.js?v=26"></script>
 </body>
 </html>
