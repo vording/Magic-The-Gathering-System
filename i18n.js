@@ -116,7 +116,7 @@
     '戦闘開始ステップ。': 'Beginning of combat step.', 'クリーンアップ・ステップ。': 'Cleanup step.',
     'ブロックしない（ログ）': 'No blocks', '戦闘ダメージはすべて軽減された': 'All combat damage was prevented', '探したが見つからなかった': 'Searched but found nothing',
     // エンジンの理由
-    'モードを選んでください': 'Choose a mode', 'コピーしない': "Don't copy", '出さない': "Don't put", 'クリーチャー呪文を唱えられません': "You can't cast creature spells", '手札に戻すものがありません': 'Nothing to return', '対象の数が違います': 'Wrong number of targets', '対象が足りません': 'Not enough targets', '完了': 'Done', '同じ対象は1回だけ選べます': 'Each target can be chosen only once', '戦闘中にだけ起動できます': 'Activate only during combat', '戦闘終了ステップにだけ起動できます': 'Activate only during the end of combat step', '自分のターンにだけ起動できます': 'Activate only during your turn', '墓地のカードが足りません（スレッショルド）': 'Not enough cards in your graveyard (threshold)', 'クリックで選ぶ（もう一度で取り消し）': 'Click to choose (click again to undo)', '白': 'White', '青': 'Blue', '黒': 'Black', '赤': 'Red', '緑': 'Green', '選んでください': 'Choose one', '追加のコストで生け贄に捧げるものがありません': 'Nothing to sacrifice for the additional cost',
+    'モードを選んでください': 'Choose a mode', 'クリックしたカードが1つ目の束、残りが2つ目の束になります': 'Cards you click form pile 1; the rest form pile 2', '1つ目の束にするカードを選んでください': 'Choose the cards for pile 1', '束を選んでください': 'Choose a pile', 'コピーしない': "Don't copy", '出さない': "Don't put", 'クリーチャー呪文を唱えられません': "You can't cast creature spells", '手札に戻すものがありません': 'Nothing to return', '対象の数が違います': 'Wrong number of targets', '対象が足りません': 'Not enough targets', '完了': 'Done', '同じ対象は1回だけ選べます': 'Each target can be chosen only once', '戦闘中にだけ起動できます': 'Activate only during combat', '戦闘終了ステップにだけ起動できます': 'Activate only during the end of combat step', '自分のターンにだけ起動できます': 'Activate only during your turn', '墓地のカードが足りません（スレッショルド）': 'Not enough cards in your graveyard (threshold)', 'クリックで選ぶ（もう一度で取り消し）': 'Click to choose (click again to undo)', '白': 'White', '青': 'Blue', '黒': 'Black', '赤': 'Red', '緑': 'Green', '選んでください': 'Choose one', '追加のコストで生け贄に捧げるものがありません': 'Nothing to sacrifice for the additional cost',
     '追加のコストで捨てるカードがありません': 'No card to discard for the additional cost', 'このターンはもう起動できません': "It can't be activated again this turn",
     'タップできるものがありません': 'Nothing to tap', '自分のアップキープにだけ起動できます': 'Activate only during your upkeep',
     '手札に加えるカードを選んでください': 'Choose a card to put into your hand', '並べる順にカードを選んでください': 'Choose cards in the order to put them',
@@ -238,6 +238,15 @@
   // ---------- 訳語（文の形） ----------
   const PATTERNS = [
     // ルール対戦（追加の処理）
+    [/^(\d+)つ選んでください$/, (_, n) => `Choose ${n}`],
+    [/^束に分けた：［(.*)］と［(.*)］$/, (_, a, b) => `Separated into piles: [${list(a)}] and [${list(b)}]`],
+    [/^(.+)：(\d+)枚の束を手札に加えた$/, (_, c, n) => `${c}: put a pile of ${cards(n)} into the hand`],
+    [/^(.+)：束に分ける$/, (_, c) => `${c}: separate into piles`],
+    [/^(.+)：2つの束に分けてください（1つ目：(.*)／2つ目：(.*)）$/, (_, c, a, b) => `${c}: separate into two piles (pile 1: ${list(a)} / pile 2: ${list(b)})`],
+    [/^(.+)：手札に加える束を選んでください（もう1つは墓地へ）$/, (_, c) => `${c}: choose the pile to put into your hand (the other goes to the graveyard)`],
+    [/^(1|2)つ目（(\d+)枚）：(.*)$/, (_, k, n, l) => `Pile ${k} (${cards(n)}): ${list(l)}`],
+    [/^(.+)：公開されたカードを2つの束に分けてください。$/, (_, c) => `${c}: separate the revealed cards into two piles.`],
+    [/^(.+)：手札に加える束を選んでください。$/, (_, c) => `${c}: choose a pile to put into your hand.`],
     [/^(.+)は(.+)のコピーになった$/, (_, a, b) => `${a} became a copy of ${b}`],
     [/^(.+)：コピーするクリーチャーを選んでください$/, (_, c) => `${c}: choose a creature to copy`],
     [/^(.+)：コピーするクリーチャー$/, (_, c) => `${c}: creature to copy`],

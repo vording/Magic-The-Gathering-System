@@ -510,6 +510,8 @@ function hintText(n) {
     case 'triggerTarget': return `${n.pending.name}の誘発型能力の対象を選んでください。`;
     case 'discard': return `捨てるカードを手札から${n.pending.n}枚選んでください（${n.pending.reason}）。`;
     case 'search': return 'ライブラリーから探すカードを選んでください。';
+    case 'separate': return `${n.pending.reason}：公開されたカードを2つの束に分けてください。`;
+    case 'choosePile': return `${n.pending.reason}：手札に加える束を選んでください。`;
     case 'chooseWord': return `${n.pending.reason}：${n.pending.what === 'color' ? '色' : 'クリーチャー・タイプ'}を選んでください。`;
     case 'sacrifice': return `生け贄に捧げるものを${n.pending.n}つ選んでください（${n.pending.reason}）。`;
     case 'chooseHand': return `${n.pending.reason}：捨てさせるカードを選んでください。`;
@@ -708,6 +710,23 @@ function renderBanner(n) {
         button(`ブロックを確定（${Object.keys(ui.blocks).length}体）`, () => act(ME, { type: 'blockers', blocks: ui.blocks }), true));
     case 'payOrNot':
       return show(span(`${p.reason}`), button(`${p.cost}を支払う`, () => act(ME, { type: 'pay', yes: true }), true, !p.canPay), button('支払わない', () => act(ME, { type: 'pay', yes: false })));
+    case 'separate': {
+      const hint = 'クリックしたカードが1つ目の束、残りが2つ目の束になります';
+      const okSep = () => { closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); };
+      openViewer({ title: `${p.reason}：束に分ける`, ids: p.options, hint, multi: true, onOk: okSep });
+      const names = (ids) => ids.map((id) => G.objects[id].card.name).join('、') || 'なし';
+      const a = p.options.filter((id) => ui.picks.has(id));
+      const b = p.options.filter((id) => !ui.picks.has(id));
+      return show(span(`${p.reason}：2つの束に分けてください（1つ目：${names(a)}／2つ目：${names(b)}）`),
+        button('一覧を開く', () => openViewer({ title: `${p.reason}：束に分ける`, ids: p.options, hint, multi: true, onOk: okSep })),
+        button('決定', () => { closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); }, true));
+    }
+    case 'choosePile': {
+      const names = (ids) => ids.map((id) => G.objects[id].card.name).join('、') || 'なし';
+      return show(span(`${p.reason}：手札に加える束を選んでください（もう1つは墓地へ）`),
+        button(`1つ目（${p.piles[0].length}枚）：${names(p.piles[0])}`, () => act(ME, { type: 'pile', pile: 0 })),
+        button(`2つ目（${p.piles[1].length}枚）：${names(p.piles[1])}`, () => act(ME, { type: 'pile', pile: 1 })));
+    }
     case 'copy':
       openViewer({ title: `${p.reason}：コピーするクリーチャー`, ids: p.options, hint: 'クリックで選ぶ', choose: true });
       return show(span(`${p.reason}：コピーするクリーチャーを選んでください`), button('一覧を開く', () => openViewer({ title: `${p.reason}：コピーするクリーチャー`, ids: p.options, hint: 'クリックで選ぶ', choose: true })), button('コピーしない', () => { closeViewer(); act(ME, { type: 'choose', ids: [] }); }));
@@ -715,7 +734,8 @@ function renderBanner(n) {
       return show(span(`${p.reason}：戦場に出すカードを手札から選んでください`), ...p.options.map((h) => button(G.objects[h].card.name, () => act(ME, { type: 'choose', ids: [h] }))), button('出さない', () => act(ME, { type: 'choose', ids: [] })));
     case 'sacUnlessOther': {
       const what = p.how === 'discard' ? '捨てる' : p.how === 'return' ? '手札に戻す' : '生け贄に捧げる';
-      openViewer({ title: `${p.reason}：${what}ものを${p.n}つ`, ids: p.options, hint: 'クリックで選ぶ（もう一度で取り消し）', multi: true });
+      openViewer({ title: `${p.reason}：${what}ものを${p.n}つ`, ids: p.options, hint: 'クリックで選ぶ（もう一度で取り消し）', multi: true,
+        onOk: () => { if (ui.picks.size !== p.n) return toast(`${p.n}つ選んでください`); closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); } });
       return show(span(`${p.reason}：${what}ものを選ぶ（${ui.picks.size}/${p.n}）。選ばなければ${p.reason}を生け贄に捧げます`),
         button('決定', () => { closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); }, true, ui.picks.size !== p.n),
         button(`${p.reason}を生け贄に捧げる`, () => { closeViewer(); act(ME, { type: 'choose', ids: [] }); }));
@@ -739,8 +759,9 @@ function renderBanner(n) {
     case 'reorder': {
       const title = n.type === 'scry' ? '占術' : '並べ替え';
       const hint = n.type === 'scry' ? '一番下に置くカードをクリック（もう一度で取り消し）' : '一番上に置く順にクリック';
-      openViewer({ title, ids: p.options, hint, multi: true });
-      return show(span(`${title}：${ui.picks.size}枚選択`), button('一覧を開く', () => openViewer({ title, ids: p.options, hint, multi: true })), button('決定', () => { closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); }, true));
+      const okMulti = () => { closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); };
+      openViewer({ title, ids: p.options, hint, multi: true, onOk: okMulti });
+      return show(span(`${title}：${ui.picks.size}枚選択`), button('一覧を開く', () => openViewer({ title, ids: p.options, hint, multi: true, onOk: okMulti })), button('決定', () => { closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); }, true));
     }
     case 'search':
       openViewer({ title: 'ライブラリーから選ぶ', ids: p.options, hint: 'カードをクリックして選ぶ', choose: true });
@@ -792,6 +813,7 @@ function renderViewer() {
   const ids = viewerState.zone ? G.players[viewerState.player][viewerState.zone] : viewerState.ids;
   $('viewer-title').textContent = `${viewerState.title}（${ids.length}枚）`;
   $('viewer-hint').textContent = viewerState.hint ?? '';
+  $('viewer-ok').hidden = !viewerState.onOk;
   // 墓地・追放は新しいものから。ライブラリーの上のカードは上から順に
   const list = viewerState.zone ? [...ids].reverse() : ids;
   $('viewer-cards').replaceChildren(...list.map((id) => cardEl(id, 'viewer')));
@@ -963,6 +985,7 @@ function init() {
   $('opp-pile-graveyard').addEventListener('click', () => openViewer({ title: `${G.players[OPP].name}の墓地`, player: OPP, zone: 'graveyard' }));
   $('opp-pile-exile').addEventListener('click', () => openViewer({ title: `${G.players[OPP].name}の追放`, player: OPP, zone: 'exile' }));
   $('viewer-close').addEventListener('click', closeViewer);
+  $('viewer-ok').addEventListener('click', () => viewerState?.onOk?.());
   $('viewer').addEventListener('cancel', (e) => { e.preventDefault(); closeViewer(); });
   $('setup-form').addEventListener('submit', startFromSetup);
   $('setup-deck').addEventListener('change', updateSupport);

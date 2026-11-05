@@ -1021,6 +1021,10 @@ const Engine = (() => {
       // 選ぶ余地がなければそのまま
       if (options.length === n) { for (const id of options) move(G, id, 'graveyard'); return; }
       G.pending = { ...c, n, options };
+    } else if (c.type === 'separate') {
+      const options = c.options.filter((id) => G.players[c.owner].library.includes(id));
+      if (!options.length) return;
+      G.pending = { ...c, options };
     } else if (c.type === 'copy') {
       const options = G.battlefield.filter((x) => x !== c.id && isType(obj(G, x), 'creature'));
       if (onBf(G, c.id)) obj(G, c.id).cloning = false;
@@ -1898,6 +1902,13 @@ const Engine = (() => {
         break;
       }
       case 'removeFromCombat': if (t?.obj != null) { removeFromCombat(G, t.obj); obj(G, t.obj).tapped = false; } break;
+      case 'piles': {
+        const top = G.players[p].library.slice(0, val(fx.n));
+        if (!top.length) break;
+        log(G, p, `${by}：上から${top.length}枚を公開した：${top.map((id) => nameOf(G, id)).join('、')}`);
+        G.choices.push({ type: 'separate', player: q, owner: p, options: top, rest: fx.rest, reason: by });
+        break;
+      }
       case 'revealTake': {
         const top = G.players[p].library.slice(0, val(fx.n));
         const srcObj = obj(G, src);
@@ -2267,6 +2278,33 @@ const Engine = (() => {
         log(G, p, `上から${pend.options.length}枚を並べ替えた`);
         return;
       }
+      case 'separate': {
+        // 選んだカードを1つ目の束、残りを2つ目の束にする
+        const ids = (a.ids ?? []).map(Number);
+        if (a.type !== 'choose' || !ids.every((id) => pend.options.includes(id)) || new Set(ids).size !== ids.length) fail('1つ目の束にするカードを選んでください');
+        const pileA = pend.options.filter((id) => ids.includes(id));
+        const pileB = pend.options.filter((id) => !ids.includes(id));
+        log(G, p, `束に分けた：［${pileA.map((id) => nameOf(G, id)).join('、') || 'なし'}］と［${pileB.map((id) => nameOf(G, id)).join('、') || 'なし'}］`);
+        G.pending = { type: 'choosePile', player: pend.owner, piles: [pileA, pileB], rest: pend.rest, reason: pend.reason };
+        return;
+      }
+      case 'choosePile': {
+        const k = Number(a.pile);
+        if (a.type !== 'pile' || (k !== 0 && k !== 1)) fail('束を選んでください');
+        G.pending = null;
+        const lib = G.players[p].library;
+        for (const [i, pile] of pend.piles.entries()) {
+          for (const id of pile) {
+            const at = lib.indexOf(id);
+            if (at < 0) continue;
+            lib.splice(at, 1);
+            if (i === k) { obj(G, id).zone = 'hand'; G.players[p].hand.push(id); }
+            else { obj(G, id).zone = pend.rest; G.players[p][pend.rest].push(id); }
+          }
+        }
+        log(G, p, `${pend.reason}：${pend.piles[k].length}枚の束を手札に加えた`);
+        return;
+      }
       case 'copy': {
         G.pending = null;
         if (obj(G, pend.id)) obj(G, pend.id).cloning = false;
@@ -2425,6 +2463,9 @@ const Engine = (() => {
     };
     // ライブラリーから探している最中のカードは、探しているプレイヤーには見せる
     const shown = new Set(G.pending?.player === p && ['search', 'chooseHand', 'scry', 'lookPick', 'reorder'].includes(G.pending.type) ? G.pending.options : []);
+    // 公開したカード（束に分ける・束を選ぶ）は両方のプレイヤーに見える
+    if (G.pending?.type === 'separate') for (const id of G.pending.options) shown.add(id);
+    if (G.pending?.type === 'choosePile') for (const id of G.pending.piles.flat()) shown.add(id);
     for (const pl of v.players) for (const id of pl.library) if (!shown.has(id)) hide(id);
     for (const id of v.players[other(p)].hand) hide(id);
     v.sfx = [];
@@ -2442,7 +2483,7 @@ const Engine = (() => {
       'exileGraveAll', 'scry', 'lookPick', 'reorder', 'payThen', 'tapAll', 'unblockable', 'cop', 'payOr', 'topdeck', 'returnOwn',
       'animate', 'threaten', 'giveControl', 'extraTurn', 'playerShroud', 'drawPlayer', 'delayed', 'sacUnlessOther', 'exileSameName', 'shuffleGraveIn',
       'millHalf', 'bounceAllOwned', 'putFromHand', 'drawBoundController', 'countersAttached', 'returnOwnPlayer', 'removeFromCombat', 'revealTake',
-      'destroyAttachedOrSelf', 'destroySelf', 'untapAll', 'gainPlayer', 'damagePlayerAndCreatures', 'counterExile', 'preventAllTarget', 'exileSelfSpell',
+      'piles', 'destroyAttachedOrSelf', 'destroySelf', 'untapAll', 'gainPlayer', 'damagePlayerAndCreatures', 'counterExile', 'preventAllTarget', 'exileSelfSpell',
       'untapLandsPlayer', 'peek', 'peekTop', 'fogSelf', 'animateLands'],
     triggers: ['creatureDealsCombatDamage', 'becomesTapped', 'enchantedTapped', 'enchantedDealtDamage', 'enchantedUpkeep', 'landTappedForMana', 'dealtCombatDamage', 'creatureDamagesPlayer', 'enchantedDealsDamage', 'attacksAlone', 'blocksOrBlockedBy', 'blockedBy', 'eachDrawstep', 'drawCard', 'discard', 'damagedDies', 'etb', 'dies', 'etbOrDies', 'blocksOrBlocked', 'leaves', 'upkeep', 'eachUpkeep', 'endstep', 'eachEndstep', 'drawstep', 'attacks', 'blocks', 'attacksOrBlocks', 'becomesBlocked',
       'combatDamagePlayer', 'dealsDamagePlayer', 'dealtDamage', 'creatureEnters', 'creatureDies', 'cast', 'cycled'],
