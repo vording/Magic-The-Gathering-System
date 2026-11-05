@@ -348,7 +348,14 @@ const AI = (() => {
 
   // ---------- 戦闘 ----------
 
+  // 単独では攻撃できないものが1体だけになったら攻撃しない
   function chooseAttackers(G, p) {
+    const list = chooseAttackers0(G, p);
+    if (list.length === 1 && (E().ch(G, list[0]).notAlone || E().ch(G, list[0]).notAloneAttack)) return [];
+    return list;
+  }
+
+  function chooseAttackers0(G, p) {
     const q = other(p);
     const mine = creatures(G, p).filter((id) => E().canAttack(G, id) && E().ch(G, id).p > 0);
     const blockers = creatures(G, q).filter((id) => !o(G, id).tapped);
@@ -569,6 +576,7 @@ const AI = (() => {
       }
       case 'discard': return { type: 'choose', ids: chooseDiscard(G, p, pend.n, pend.options) };
       case 'search': return { type: 'choose', ids: [chooseSearch(G, p, pend.options)] };
+      case 'copy': return { type: 'choose', ids: [[...pend.options].sort((a, b) => value(G, b) - value(G, a))[0]] };
       case 'putFromHand': return { type: 'choose', ids: [[...pend.options].sort((a, b) => (o(G, b).def.cmc || 0) - (o(G, a).def.cmc || 0))[0]] };
       case 'sacUnlessOther': {
         const keep = value(G, pend.id) >= 4;

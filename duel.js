@@ -708,6 +708,9 @@ function renderBanner(n) {
         button(`ブロックを確定（${Object.keys(ui.blocks).length}体）`, () => act(ME, { type: 'blockers', blocks: ui.blocks }), true));
     case 'payOrNot':
       return show(span(`${p.reason}`), button(`${p.cost}を支払う`, () => act(ME, { type: 'pay', yes: true }), true, !p.canPay), button('支払わない', () => act(ME, { type: 'pay', yes: false })));
+    case 'copy':
+      openViewer({ title: `${p.reason}：コピーするクリーチャー`, ids: p.options, hint: 'クリックで選ぶ', choose: true });
+      return show(span(`${p.reason}：コピーするクリーチャーを選んでください`), button('一覧を開く', () => openViewer({ title: `${p.reason}：コピーするクリーチャー`, ids: p.options, hint: 'クリックで選ぶ', choose: true })), button('コピーしない', () => { closeViewer(); act(ME, { type: 'choose', ids: [] }); }));
     case 'putFromHand':
       return show(span(`${p.reason}：戦場に出すカードを手札から選んでください`), ...p.options.map((h) => button(G.objects[h].card.name, () => act(ME, { type: 'choose', ids: [h] }))), button('出さない', () => act(ME, { type: 'choose', ids: [] })));
     case 'sacUnlessOther': {

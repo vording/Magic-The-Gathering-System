@@ -492,6 +492,32 @@ if (pool) {
     const C = setup({ p0: { bf: [P('Steel Golem')], hand: [K.bears] } });
     assert.equal(Engine.castInfo(C, 0, id(C, 'Grizzly Bears')).ok, false);
   };
+  tests['real cards: replacement, land types, extra mana, graveyard, clone'] = () => {
+    const F = setup({ p0: { hand: [K.bolt], bf: [L.Mountain, P('Furnace of Rath')] } });
+    ok(Engine.perform(F, 0, { type: 'cast', id: id(F, 'Lightning Bolt'), targets: [{ player: 1 }] }));
+    passBoth(F);
+    assert.equal(F.players[1].life, 14);
+    const W = setup({ p0: { hand: [K.bolt], bf: [L.Mountain] }, p1: { bf: [P('Worship'), K.bears] } });
+    W.players[1].life = 2;
+    ok(Engine.perform(W, 0, { type: 'cast', id: id(W, 'Lightning Bolt'), targets: [{ player: 1 }] }));
+    passBoth(W);
+    assert.equal(W.players[1].life, 1);
+    const B = setup({ p0: { bf: [P('Blood Moon'), P('City of Brass')] } });
+    Engine.run(B);
+    assert.deepEqual(Engine.manaSources(B, 0).find((x) => B.objects[x.id].def.name === 'City of Brass').choices, ['R']);
+    const V2 = setup({ p0: { hand: [K.bears], bf: [P('Vernal Bloom'), L.Forest, L.Forest] } });
+    ok(Engine.perform(V2, 0, { type: 'cast', id: id(V2, 'Grizzly Bears') }));
+    assert.equal(V2.players[0].pool.G, 2); // 2枚タップして2マナ余る
+    const Vl = setup({ p0: { bf: [K.bears, L.Plains], grave: [P('Valor')] } });
+    assert.ok(Engine.ch(Vl, id(Vl, 'Grizzly Bears')).kw.has('first strike'));
+    const C = setup({ p0: { hand: [P('Clone')], bf: Array(4).fill(L.Island) }, p1: { bf: [K.angel] } });
+    ok(Engine.perform(C, 0, { type: 'cast', id: id(C, 'Clone') }));
+    passBoth(C);
+    assert.equal(Engine.needs(C).type, 'copy');
+    ok(Engine.perform(C, 0, { type: 'choose', ids: [id(C, 'Serra Angel', 'battlefield', 1)] }));
+    const clone = C.battlefield.find((x) => C.objects[x].controller === 0 && C.objects[x].def.name === 'Serra Angel');
+    assert.ok(clone != null && Engine.ch(C, clone).kw.has('flying'));
+  };
   tests['oldframe-modern: random decks play to the end'] = () => {
     const games = Number(process.env.GAMES ?? 40);
     const basics = pool.filter((c) => /Basic Land/.test(c.typeLine) && !/Snow/.test(c.typeLine));
