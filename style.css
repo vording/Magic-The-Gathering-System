@@ -198,3 +198,12 @@ html.phone .art-list { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr
 html.phone .import-dialog textarea { font-size: 16px; min-height: 180px; }
 html.phone .io-actions button { padding: 0 2px; font-size: 13px; white-space: nowrap; }
 html.phone #export-text { font-size: 16px; }
+
+/* ---------- PC：画面いっぱい ----------
+   検索結果のカードは画面の高さに合わせた大きさで並べ、カードの拡大は縦に伸びすぎないようにする */
+html:not(.phone) .layout { grid-template-columns: minmax(0, 1fr) clamp(320px, 24cqw, 460px); gap: clamp(6px, .5cqw, 10px); padding: clamp(6px, .5cqw, 10px); }
+html:not(.phone) .results { grid-template-columns: repeat(auto-fill, minmax(clamp(120px, 15cqh, 210px), 1fr)); }
+html:not(.phone) .preview-frame { width: min(100%, calc(34cqh / 1.395)); align-self: center; margin-left: auto; margin-right: auto; }
+html:not(.phone) .search-panel, html:not(.phone) .deck-panel { background-image: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(0, 0, 0, .1)); }
+html:not(.phone) .result img, html:not(.phone) .result .noimg { transition: transform .12s ease-out; }
+html:not(.phone) .result:hover img { transform: translateY(-3px); }

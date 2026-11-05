@@ -92,3 +92,5 @@ html.phone .announce-name { font-size: 16px; }
 .mana-avail:empty { display: none; }
 .mana-avail .mana-total { margin-right: 2px; }
 .mana-any { background: linear-gradient(90deg, #f8f4dc, #9cc9ef, #a99fa0, #f09477, #9bd3ae); }
+html.phone .mana-avail { flex-wrap: nowrap; margin: 0; }
+html.phone .mana-avail .mana-total { display: none; }
