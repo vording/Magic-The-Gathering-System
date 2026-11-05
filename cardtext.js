@@ -217,6 +217,34 @@ const CardText = (() => {
       return a ? [...(Array.isArray(a) ? a : [a]), { type: m[2] === 'gain' ? 'gain' : 'loseSelf', n: num(m[3]) }] : null;
     }
     if ((m = /^(that creature|it) can't be regenerated$/.exec(s))) return { type: 'noRegen' };
+    if (/^search its controller's graveyard, hand, and library for all cards with the same name as that (?:creature|enchantment|artifact|land|spell) and exile them$/.test(s)) return { type: 'exileSameName' };
+    if (s === 'then that player shuffles' || s === 'that player shuffles') return { type: 'none' };
+    if ((m = /^(target player|you) shuffles? (?:their|your) graveyard into (?:their|your) library$/.exec(s))) return { type: 'shuffleGraveIn', target: m[1] === 'you' ? { kind: 'player', players: ['me'], auto: true } : { kind: 'player', players: ['me', 'opp'] } };
+    if (s === 'target player mills half their library, rounded down') return { type: 'millHalf', target: { kind: 'player', players: ['me', 'opp'] } };
+    if (s === 'return all artifacts target player owns to their hand') return { type: 'bounceAllOwned', what: 'artifact', target: { kind: 'player', players: ['me', 'opp'] } };
+    if (s === 'return each other creature you control to its owner\'s hand') return { type: 'bounceAll', filter: { types: ['creature'], non: [], colors: [], state: [], side: 'me' }, other: true };
+    // 土地などがクリーチャーになる（ミシュラランド）
+    if ((m = /^this becomes an? (\d+|x)\/(\d+|x) ([a-z -]+?) creature(?: with ([a-z ,]+?))?( until end of turn| until end of combat)?$/.exec(s))) {
+      const words = m[3].split(/\s+/);
+      return { type: 'animate', p: m[1] === 'x' ? 'X' : Number(m[1]), t: m[2] === 'x' ? 'X' : Number(m[2]), kw: kwList(m[4]),
+        colors: words.filter((w) => COLOR_WORDS[w]).map((w) => COLOR_WORDS[w]), artifact: words.includes('artifact'),
+        subtypes: words.filter((w) => !COLOR_WORDS[w] && w !== 'artifact' && w !== 'and').map((w) => w[0].toUpperCase() + w.slice(1)),
+        until: m[5] ? (m[5].endsWith('combat') ? 'combat' : 'eot') : null };
+    }
+    if (s === 'it\'s still a land' || s === 'they\'re still lands') return { type: 'none' };
+    // コントロール
+    if (s === 'untap target creature and gain control of it until end of turn') return { type: 'threaten', target: { kind: 'card', filter: T_CREATURE() } };
+    if ((m = /^that creature gains ([a-z ,]+?) until end of turn$/.exec(s))) return { type: 'pump', p: '+0', t: '+0', kw: kwList(m[1]), sameTarget: true };
+    if (s === 'target opponent gains control of this') return { type: 'giveControl', target: { kind: 'player', players: ['opp'] } };
+    // 追加ターン・被覆・ドロー
+    if ((m = /^(target player|you) takes? (an|two) extra turns? after this one$/.exec(s))) return { type: 'extraTurn', n: m[2] === 'two' ? 2 : 1, target: m[1] === 'you' ? { kind: 'player', players: ['me'], auto: true } : { kind: 'player', players: ['me', 'opp'] } };
+    if (s === 'take an extra turn after this one') return { type: 'extraTurn', n: 1, target: { kind: 'player', players: ['me'], auto: true } };
+    if (s === 'you gain shroud until end of turn') return { type: 'playerShroud' };
+    if ((m = new RegExp(`^target player draws (an additional card|${N} cards?)$`).exec(s))) return { type: 'drawPlayer', n: m[1] === 'an additional card' ? 1 : num(m[2]), target: { kind: 'player', players: ['me', 'opp'] } };
+    // 戦闘の終わりに
+    if (s === 'destroy target creature at end of combat') return { type: 'delayed', what: 'destroy', target: { kind: 'card', filter: T_CREATURE() } };
+    if (s === 'destroy this at end of combat') return { type: 'delayed', what: 'destroy', self: true };
+    if (s === 'sacrifice this at end of combat') return { type: 'delayed', what: 'sacrifice', self: true };
     if ((m = new RegExp(`^each player loses ${N} life$`).exec(s))) return { type: 'lose', n: num(m[1]), target: { kind: 'player', players: ['me', 'opp'], auto: true } };
     if ((m = /^you lose life equal to (?:that creature's|its) (toughness|power)$/.exec(s))) return { type: 'loseSelf', n: 'X', amount: { count: { ref: m[1] === 'power' ? 'targetPower' : 'targetToughness' } } };
     if ((m = new RegExp(`^its controller gains ${N} life$`).exec(s))) return { type: 'gainTargetController', n: num(m[1]) };
@@ -282,6 +310,10 @@ const CardText = (() => {
     if (s === 'exile target card from a graveyard') return { type: 'exileGrave', target: { kind: 'anyGrave', filter: null } };
     if (s === 'exile all cards from target player\'s graveyard') return { type: 'exileGraveAll', target: { kind: 'player', players: ['me', 'opp'] } };
     if ((m = new RegExp(`^(target player|target opponent) loses ${N} life$`).exec(s))) return { type: 'lose', n: num(m[2]), target: { kind: 'player', players: m[1] === 'target player' ? ['me', 'opp'] : ['opp'] } };
+    // 割り振るダメージ
+    if ((m = new RegExp(`^this deals ${N} damage divided as you choose among (one or two|one, two, or three|any number of) targets$`).exec(s))) {
+      return { type: 'damage', n: num(m[1]), target: { kind: 'any', filter: T_CREATURE(), divided: { max: m[2] === 'one or two' ? 2 : m[2] === 'one, two, or three' ? 3 : 99 } } };
+    }
     // 複合の文：「〜にNダメージと、あなたにMダメージ」「〜にNダメージを与え、あなたはMライフを得る」
     if ((m = /^this deals (\w+) damage to (.+?) and (\w+) damage to you$/.exec(s))) {
       const a = effect1(`this deals ${m[1]} damage to ${m[2]}`, card);
@@ -391,6 +423,9 @@ const CardText = (() => {
     if ((m = /^add (.+)$/.exec(s)) && parseMana(m[1])) return { type: 'addMana', mana: parseMana(m[1]) };
     if (s === 'sacrifice this') return { type: 'sacSelf' };
     if ((m = /^sacrifice this unless you pay (\{[^.]+\})$/.exec(s))) return { type: 'sacUnless', cost: m[1].toUpperCase() };
+    if ((m = /^sacrifice (?:it|this) unless you (sacrifice|discard|return) (an?|two|three) (\w+)(?: cards?)?(?: you control to (?:its|their) owner's hand)?$/.exec(s))) {
+      return { type: 'sacUnlessOther', how: m[1], n: num(m[2]), what: m[3].replace(/s$/, '').replace(/^island$/, 'island') };
+    }
     if (s === 'prevent all combat damage that would be dealt this turn') return { type: 'fog' };
     if ((m = /^return target (creature )?card from your graveyard to your hand$/.exec(s))) {
       return { type: 'regrow', target: { kind: 'grave', filter: m[1] ? { types: ['creature'], non: [], colors: [], state: [] } : null } };
@@ -529,7 +564,11 @@ const CardText = (() => {
     [/^whenever this blocks$/, 'blocks'],
     [/^whenever this attacks or blocks$/, 'attacksOrBlocks'],
     [/^whenever this becomes blocked$/, 'becomesBlocked'],
+    [/^whenever this attacks alone$/, 'attacksAlone'],
     [/^whenever this blocks or becomes blocked$/, 'blocksOrBlocked'],
+    [/^whenever this blocks or becomes blocked by an? (non-?\w+ )?creature$/, 'blocksOrBlockedBy', (m) => ({ otherNot: m[1]?.trim().replace(/^non-?/, '') ?? null }), 'obj'],
+    [/^whenever this becomes blocked by a creature$/, 'blockedBy', null, 'obj'],
+    [/^at the beginning of each player's draw step$/, 'eachDrawstep', null, 'player'],
     [/^when this enters or dies$/, 'etbOrDies'],
     [/^whenever this deals combat damage to a player$/, 'combatDamagePlayer'],
     [/^whenever this deals damage to a player$/, 'combatDamagePlayer'],
@@ -555,6 +594,10 @@ const CardText = (() => {
     // オーラ・装備品
     if ((m = /^(enchanted|equipped) creature gets ([+-]\d+)\/([+-]\d+)(?: and has ([a-z ,]+))?$/.exec(s))) {
       return { kind: 'attached', p: Number(m[2]), t: Number(m[3]), kw: kwList(m[4]) };
+    }
+    if ((m = /^(enchanted|equipped) (creature|land|permanent) (?:gets ([+-]\d+)\/([+-]\d+) and )?has "(.+)"$/.exec(s))) {
+      const ab = activatedOf(m[5].replace(/\.$/, '.'), null);
+      return ab && ab !== 'manual' ? { kind: 'attached', p: Number(m[3] ?? 0), t: Number(m[4] ?? 0), kw: [], grants: [ab] } : null;
     }
     if ((m = /^(enchanted|equipped) creature has ([a-z ,]+)$/.exec(s))) return { kind: 'attached', p: 0, t: 0, kw: kwList(m[2]) };
     if ((m = /^(enchanted|equipped) creature gets ([+-]\d+)\/([+-]\d+) and can't block$/.exec(s))) return { kind: 'attached', p: Number(m[2]), t: Number(m[3]), kw: [], cantBlock: true };
@@ -606,6 +649,7 @@ const CardText = (() => {
     }
     // 攻撃・ブロックの制限
     if (s === 'this can\'t be blocked except by walls') return { kind: 'self', blockOnly: 'wall' };
+    if (s === 'this can\'t be blocked as long as it\'s attacking alone') return { kind: 'self', unblockableAlone: true };
     if (s === 'this can\'t be blocked by walls') return { kind: 'self', notBlockedBy: 'wall' };
     if (s === 'this can\'t be blocked by more than one creature') return { kind: 'self', maxBlockers: 1 };
     if ((m = /^this can't be blocked except by (two|three) or more creatures$/.exec(s))) return { kind: 'self', minBlockers: num(m[1]) };
@@ -615,6 +659,25 @@ const CardText = (() => {
     if ((m = /^this can't be blocked except by creatures with (flying|horsemanship|shadow)$/.exec(s))) return { kind: 'self', blockOnlyKw: m[1] };
     if (s === 'this can block any number of creatures') return { kind: 'self' };
     if (s === 'this can\'t be countered' || s === 'this spell can\'t be countered') return { kind: 'uncounterable' };
+    if ((m = /^you control enchanted (creature|land|artifact|permanent|enchantment)$/.exec(s))) return { kind: 'attached', p: 0, t: 0, kw: [], control: true };
+    if (s === 'you have shroud') return { kind: 'player', shroud: true };
+    if (s === 'you have no maximum hand size') return { kind: 'player', noMaxHand: true };
+    if (s === 'you may have this assign its combat damage as though it weren\'t blocked') return { kind: 'self', assignUnblocked: true };
+    if (s === 'this can\'t attack or block alone') return { kind: 'self', notAlone: true };
+    if (s === 'this can\'t attack alone') return { kind: 'self', notAloneAttack: true };
+    if (s === 'this can\'t block alone') return { kind: 'self', notAloneBlock: true };
+    // コストの増減
+    if ((m = /^((?:white|blue|black|red|green|creature|artifact|enchantment|instant|sorcery|goblin|zombie|elf|wizard)(?: spells and (?:white|blue|black|red|green))?) spells you cast cost \{(\d+)\} less to cast$/.exec(s))) {
+      return { kind: 'costMod', who: 'you', words: m[1].split(' spells and '), delta: -Number(m[2]) };
+    }
+    if ((m = /^((?:artifact and enchantment|creature|noncreature|artifact|enchantment|instant and sorcery)) spells your opponents cast cost \{(\d+)\} more to cast$/.exec(s))) {
+      return { kind: 'costMod', who: 'opp', words: m[1].split(' and '), delta: Number(m[2]) };
+    }
+    if ((m = /^creature spells of the chosen type cost \{(\d+)\} less to cast$/.exec(s))) return { kind: 'costMod', who: 'you', words: ['creature'], chosenType: true, delta: -Number(m[1]) };
+    // 選んだ色・タイプ
+    if ((m = /^creatures of the chosen type (?:get ([+-]\d+)\/([+-]\d+)|have ([a-z ,]+))$/.exec(s))) return { kind: 'lord', other: false, word: 'chosen', scope: 'all', p: Number(m[1] ?? 0), t: Number(m[2] ?? 0), kw: kwList(m[3]) };
+    if ((m = /^creatures of the chosen color without flying can't attack you$/.exec(s))) return { kind: 'moat', chosenColor: true, noFlying: true };
+    if (s === 'creatures without flying can\'t attack you') return { kind: 'moat', noFlying: true };
     if (s === 'prevent all damage that would be dealt to this') return { kind: 'self', preventAll: true };
     if (s === 'prevent all combat damage that would be dealt to and dealt by this') return { kind: 'self', preventCombatAll: true };
     if (s === 'enchanted creature can\'t be blocked except by walls') return { kind: 'attached', p: 0, t: 0, kw: [], blockOnly: 'wall' };
@@ -659,6 +722,33 @@ const CardText = (() => {
     return got.length > 0;
   }
 
+  // 「コスト: 効果」の行 → 起動型能力（コストでなければ null、効果が読めなければ 'manual'）
+  function activatedOf(line, def) {
+    let text = line;
+    // 「Threshold — {R}, {T}, …: … Activate only if there are seven or more cards in your graveyard.」
+    const threshold = /^threshold — /i.test(text);
+    text = text.replace(/^threshold — /i, '');
+    const colon = text.indexOf(':');
+    if (!(colon > 0 && isCostText(text.slice(0, colon)))) return null;
+    const cost = parseCost(text.slice(0, colon));
+    let body = text.slice(colon + 1).trim();
+    const flag = (re) => { const hit = re.test(body); body = body.replace(re, '').trim(); return hit; };
+    const sorcery = flag(/\s*activate only as a sorcery\.?/i);
+    const once = flag(/\s*activate only once each turn\.?/i);
+    const upkeep = flag(/\s*activate only during your upkeep\.?/i);
+    const twice = flag(/\s*activate no more than twice each turn\.?/i);
+    const combat = flag(/\s*activate only during combat\.?/i);
+    const endcombat = flag(/\s*activate only during the end of combat step\.?/i);
+    const yourTurn = flag(/\s*activate only during your turn\.?/i);
+    const ifGrave = flag(/\s*activate only if there are seven or more cards in your graveyard\.?/i) || threshold ? 7 : null;
+    const fx = effects(body, def);
+    if (!fx || !fx.length) return 'manual';
+    const mana = fx.length === 1 && fx[0].type === 'addMana' && !fx[0].amount ? fx[0].mana : null;
+    // 「数だけマナを出す」もマナ能力（スタックを使わない）。自動の支払いには使わない
+    const manaLike = !mana && fx.every((f) => f.type === 'addMana');
+    return { cost, effects: fx, mana, manaLike, sorcery, once, limit: twice ? 2 : null, upkeep, combat, endcombat, yourTurn, ifGrave, text: line, fromHand: cost.discardSelf };
+  }
+
   // ---------- カード全体 ----------
 
   const cache = new Map();
@@ -698,6 +788,9 @@ const CardText = (() => {
     let modal = null; // 「Choose one —」の後の選択肢
     for (const line of lines) {
       const lower = line.toLowerCase();
+      const choose = /^as this enters(?: the battlefield)?, choose an? (color|creature type)\.?$/.exec(lower);
+      if (choose) { def.chooseOnEtb = choose[1] === 'color' ? 'color' : 'type'; continue; }
+      if (/^protection from the chosen color\.?$/.test(lower)) { def.keywords.push('protection from the chosen color'); continue; }
       if (modal && line.startsWith('•')) {
         const fx = effects(line.replace(/^•\s*/, ''), def);
         if (fx) modal.push(fx);
@@ -723,45 +816,32 @@ const CardText = (() => {
         let body = trig[2].replace(/^it /i, 'this ').replace(/ on it\.?$/i, ' on this.');
         // 「if 〜」で始まる条件付きの誘発（ソーサリー・タイミングの確認など）は読まない
         const bound = hit ? bindTrigger(body.replace(/^you may (?!pay)/i, ''), hit[0][3]) : null;
-        const fx = hit && (!/^if /i.test(body) || /^if there are no \w+ counters on this/i.test(body)) ? effects(bound.text, def) : null;
+        // 「if this is untapped, …」は誘発する・解決するときの条件
+        let ifUntapped = false;
+        if (bound && /^if this is untapped, /i.test(bound.text)) { ifUntapped = true; bound.text = bound.text.replace(/^if this is untapped, /i, ''); }
+        const fx = hit && (!/^if /i.test(bound?.text ?? body) || /^if there are no \w+ counters on this/i.test(body)) ? effects(bound.text, def) : null;
         if (hit && fx) {
           if (bound.bound) for (const f of fx) if (f.target && !f.target.auto) f.target = { ...f.target, bound: bound.bound };
-          def.triggers.push({ event: hit[0][1], cond: hit[0][2] ? hit[0][2](hit[1]) : null, effects: fx, optional: /^you may /i.test(body), text: line });
+          const cond = hit[0][2] ? hit[0][2](hit[1]) : null;
+          def.triggers.push({ event: hit[0][1], cond: ifUntapped ? { ...(cond ?? {}), ifUntapped: true } : cond, effects: fx, optional: /^you may /i.test(body), text: line });
           continue;
         }
         def.manual.push(line);
         continue;
       }
       // 起動型能力（「コスト: 効果」）
-      const colon = line.indexOf(':');
-      if (colon > 0 && isCostText(line.slice(0, colon))) {
-        const cost = parseCost(line.slice(0, colon));
-        let body = line.slice(colon + 1).trim();
-        const sorcery = /activate only as a sorcery\.?/i.test(body);
-        const once = /activate only once each turn\.?/i.test(body);
-        const upkeep = /activate only during your upkeep\.?/i.test(body);
-        const twice = /activate no more than twice each turn\.?/i.test(body);
-        body = body.replace(/\s*activate no more than twice each turn\.?/i, '');
-        body = body.replace(/\s*activate only as a sorcery\.?/i, '').replace(/\s*activate only once each turn\.?/i, '').replace(/\s*activate only during your upkeep\.?/i, '').trim();
-        const fx = effects(body, def);
-        if (fx && fx.length) {
-          const mana = fx.length === 1 && fx[0].type === 'addMana' && !fx[0].amount ? fx[0].mana : null;
-          // 「数だけマナを出す」もマナ能力（スタックを使わない）。自動の支払いには使わない
-          const manaLike = !mana && fx.every((f) => f.type === 'addMana');
-          def.activated.push({ cost, effects: fx, mana, manaLike, sorcery, once, limit: twice ? 2 : null, upkeep, text: line, fromHand: cost.discardSelf });
-          continue;
-        }
-        def.manual.push(line);
-        continue;
-      }
+      const act = activatedOf(line, def);
+      if (act === 'manual') { def.manual.push(line); continue; }
+      if (act) { def.activated.push(act); continue; }
       if (permanent) {
-        const st = sentences(line).map(staticOf);
+        const st = (/"/.test(line) ? [line.replace(/\.$/, '')] : sentences(line)).map(staticOf);
         if (st.length && st.every(Boolean)) {
           for (const x of st) {
             if (x.kind === 'uncounterable') def.uncounterable = true;
             else if (x.kind === 'etbCounters') def.etbCounters += x.n;
             else if (x.kind === 'etbNamed') def.etbNamed = { ...(def.etbNamed ?? {}), [x.name]: x.n };
             else if (x.kind === 'sacIfNo') def.sacIfNo = x.what;
+            else if (x.kind === 'player') def.playerStatics = { ...(def.playerStatics ?? {}), ...x };
             else def.statics.push(x);
           }
           continue;

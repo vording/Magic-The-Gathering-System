@@ -238,7 +238,7 @@ function modeLabels(o) {
 function startActivate(id, index) {
   const a = Engine.activations(G, ME, id).find((x) => x.index === index);
   if (!a?.ok) return toast(a?.reason ?? 'できません');
-  const ab = G.objects[id].def.activated[index];
+  const ab = Engine.abilitiesOf(G, id)[index];
   if (a.mana) {
     const m = ab.mana;
     if (m.choices?.length > 1) {
@@ -265,6 +265,13 @@ function beginTargeting(t) {
   nextTarget();
 }
 
+// 割り振るダメージの合計
+function divideTotal(t) {
+  const o = G.objects[t.id];
+  const fx = (o.def.modes?.length ? o.def.modes[t.mode ?? 0] : o.def.spell).find((f) => f.target?.divided);
+  return fx?.n === 'X' ? t.x : fx?.n ?? 0;
+}
+
 function nextTarget() {
   const t = ui.targeting;
   for (t.i++; t.i < t.specs.length; t.i++) {
@@ -282,8 +289,23 @@ function nextTarget() {
 
 function pickTarget(target) {
   if (ui.targeting) {
-    ui.targeting.targets[ui.targeting.i] = target;
+    const t = ui.targeting;
+    const spec = t.specs[t.i];
     Sound.play('button');
+    // 割り振るダメージ：対象ごとに点数を決める
+    if (spec?.divided) {
+      const total = divideTotal(t);
+      const parts = t.targets[t.i]?.divide ?? [];
+      const rest = total - parts.reduce((a, x) => a + x.n, 0);
+      if (parts.some((x) => sameT(x, target))) return toast('同じ対象は1回だけ選べます');
+      const v = parts.length + 1 >= spec.divided.max ? rest : Number.parseInt(prompt(`この対象に与えるダメージ（残り ${rest}）`, String(rest)) ?? '', 10);
+      if (!Number.isFinite(v) || v < 1) return;
+      const n = Math.min(v, rest);
+      t.targets[t.i] = { divide: [...parts, { ...target, n }] };
+      if (rest - n > 0) return render();
+      return nextTarget();
+    }
+    t.targets[t.i] = target;
     return nextTarget();
   }
   const n = Engine.needs(G);
@@ -470,6 +492,7 @@ function hintText(n) {
     case 'triggerTarget': return `${n.pending.name}の誘発型能力の対象を選んでください。`;
     case 'discard': return `捨てるカードを手札から${n.pending.n}枚選んでください（${n.pending.reason}）。`;
     case 'search': return 'ライブラリーから探すカードを選んでください。';
+    case 'chooseWord': return `${n.pending.reason}：${n.pending.what === 'color' ? '色' : 'クリーチャー・タイプ'}を選んでください。`;
     case 'sacrifice': return `生け贄に捧げるものを${n.pending.n}つ選んでください（${n.pending.reason}）。`;
     case 'chooseHand': return `${n.pending.reason}：捨てさせるカードを選んでください。`;
     case 'scry': return '占術：ライブラリーの一番下に置くカードを選んで「決定」（選ばなかったものは上に残る）。';
@@ -618,6 +641,13 @@ function renderBanner(n) {
   const cands = currentCands();
   if (ui.targeting || (n?.player === ME && n.type === 'triggerTarget')) {
     const name = ui.targeting ? G.objects[ui.targeting.id].card.name : n.pending.name;
+    const spec = ui.targeting?.specs[ui.targeting.i];
+    if (spec?.divided) {
+      const parts = ui.targeting.targets[ui.targeting.i]?.divide ?? [];
+      const rest = divideTotal(ui.targeting) - parts.reduce((a, x) => a + x.n, 0);
+      const players = cands.filter((c) => c.player != null).map((c) => button(c.player === ME ? 'あなた（自分）' : `${G.players[c.player].name}（相手）`, () => pickTarget(c), c.player === OPP));
+      return show(span(`「${name}」：ダメージを割り振ってください（残り${rest}点）`), span('光っているカードをクリック', 'block-hint'), ...players, button('キャンセル', cancelTargeting));
+    }
     const players = cands.filter((c) => c.player != null).map((c) => button(c.player === ME ? 'あなた（自分）' : `${G.players[c.player].name}（相手）`, () => pickTarget(c), c.player === OPP));
     const extra = ui.targeting ? [button('キャンセル', cancelTargeting)] : G.triggers[0]?.optional ? [button('選ばない', () => act(ME, { type: 'skip' }))] : [];
     const graves = cands.filter((c) => c.grave != null);
@@ -650,6 +680,20 @@ function renderBanner(n) {
         button(`ブロックを確定（${Object.keys(ui.blocks).length}体）`, () => act(ME, { type: 'blockers', blocks: ui.blocks }), true));
     case 'payOrNot':
       return show(span(`${p.reason}`), button(`${p.cost}を支払う`, () => act(ME, { type: 'pay', yes: true }), true, !p.canPay), button('支払わない', () => act(ME, { type: 'pay', yes: false })));
+    case 'sacUnlessOther': {
+      const what = p.how === 'discard' ? '捨てる' : p.how === 'return' ? '手札に戻す' : '生け贄に捧げる';
+      openViewer({ title: `${p.reason}：${what}ものを${p.n}つ`, ids: p.options, hint: 'クリックで選ぶ（もう一度で取り消し）', multi: true });
+      return show(span(`${p.reason}：${what}ものを選ぶ（${ui.picks.size}/${p.n}）。選ばなければ${p.reason}を生け贄に捧げます`),
+        button('決定', () => { closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); }, true, ui.picks.size !== p.n),
+        button(`${p.reason}を生け贄に捧げる`, () => { closeViewer(); act(ME, { type: 'choose', ids: [] }); }));
+    }
+    case 'chooseWord': {
+      const COLOR_JA = { white: '白', blue: '青', black: '黒', red: '赤', green: '緑' };
+      if (p.what === 'color') return show(span(`${p.reason}：色を選んでください`), ...p.options.map((c) => button(COLOR_JA[c], () => act(ME, { type: 'word', value: c }))));
+      const sel = Object.assign(document.createElement('select'), { id: 'word-select' });
+      sel.append(...p.options.map((t) => new Option(t, t)));
+      return show(span(`${p.reason}：クリーチャー・タイプを選んでください`), sel, button('決定', () => act(ME, { type: 'word', value: sel.value }), true));
+    }
     case 'sacrifice':
       return show(span(`${p.reason}：生け贄に捧げるものをクリック（${ui.picks.size}/${p.n}）`), button('決定', () => act(ME, { type: 'choose', ids: [...ui.picks] }), true, ui.picks.size !== p.n));
     case 'chooseHand':

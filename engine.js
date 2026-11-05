@@ -90,10 +90,11 @@ const Engine = (() => {
   const nameOf = (G, id) => obj(G, id)?.card.name ?? '?';
   const onBf = (G, id) => obj(G, id)?.zone === 'battlefield';
   const bf = (G, p = null) => G.battlefield.filter((id) => p == null || obj(G, id).controller === p);
-  const isType = (o, t) => o.def.types.includes(t);
+  // タイプ（クリーチャーになった土地などは animated で足す）
+  const isType = (o, t) => o.def.types.includes(t) || (!!o.animated && (t === 'creature' || (t === 'artifact' && o.animated.artifact)));
   // サブタイプ（「Goblins」「Elves」のような複数形も）
   const singular = (w) => w.toLowerCase().replace(/ves$/, 'f').replace(/(?<!s)s$/, '');
-  const hasSub = (o, w) => o.def.subtypes.some((s) => s.toLowerCase() === w.toLowerCase() || s.toLowerCase() === singular(w));
+  const hasSub = (o, w) => [...o.def.subtypes, ...(o.animated?.subtypes ?? [])].some((s) => s.toLowerCase() === w.toLowerCase() || s.toLowerCase() === singular(w));
   const isCreatureObj = (G, id) => isType(obj(G, id), 'creature');
   const log = (G, p, text) => {
     G.log.push({ turn: G.turn, p, text });
@@ -101,6 +102,21 @@ const Engine = (() => {
   };
   const sfx = (G, name) => G.sfx.push(name);
   const toNum = (v) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) ? n : 0; };
+
+  // 起動型能力（自分の能力 ＋ つけられたオーラ・装備品が与える能力）
+  function abilitiesOf(G, id) {
+    const o = obj(G, id);
+    if (!o) return [];
+    const out = [...o.def.activated];
+    if (o.zone === 'battlefield') {
+      for (const sid of G.battlefield) {
+        const src = obj(G, sid);
+        if (src.attachedTo !== id) continue;
+        for (const st of src.def.statics) if (st.kind === 'attached' && st.grants) out.push(...st.grants);
+      }
+    }
+    return out;
+  }
 
   // 召喚酔い：コントロールし始めてから、そのプレイヤーのターンが始まっていない
   const isSick = (G, id) => {
@@ -114,7 +130,10 @@ const Engine = (() => {
   function ch(G, id) {
     const o = obj(G, id);
     const d = o.def;
-    const c = { p: toNum(d.power), t: toNum(d.toughness), hasPT: d.power != null && d.toughness != null, kw: new Set(d.keywords), colors: [...d.colors],
+    const an = o.animated;
+    const c = { p: an ? an.p : toNum(d.power), t: an ? an.t : toNum(d.toughness), hasPT: !!an || (d.power != null && d.toughness != null),
+      kw: new Set([...d.keywords, ...(an?.kw ?? [])].map((k) => (k === 'protection from the chosen color' && o.chosen ? `protection from ${o.chosen}` : k))),
+      colors: an?.colors?.length ? [...an.colors] : [...d.colors],
       cantAttack: false, cantBlock: false, unblockable: false, noUntap: false, mustAttack: false, preventAll: false };
     // P/T が数で決まるもの（どの領域でも）
     for (const s of d.statics) {
@@ -123,7 +142,7 @@ const Engine = (() => {
       if (s.setP) { const n = countOf(G, o.controller, s.setP, id); c.p = n; if (s.plusT != null) c.t = n + s.plusT; }
     }
     if (o.zone !== 'battlefield') return c;
-    const FLAGS = ['cantAttack', 'cantBlock', 'unblockable', 'noUntap', 'mustAttack', 'preventAll', 'preventCombatAll', 'blockOnly', 'notBlockedBy', 'maxBlockers', 'minBlockers',
+    const FLAGS = ['unblockableAlone', 'cantAttack', 'cantBlock', 'unblockable', 'noUntap', 'mustAttack', 'preventAll', 'preventCombatAll', 'assignUnblocked', 'notAlone', 'notAloneAttack', 'notAloneBlock', 'blockOnly', 'notBlockedBy', 'maxBlockers', 'minBlockers',
       'blockOnlyFlying', 'cantBlockPower', 'attackNeeds', 'blockOnlyKw'];
     const add = (s, owner = o.controller) => {
       c.p += s.p || 0;
@@ -146,6 +165,7 @@ const Engine = (() => {
         if (s.kind === 'lord' && isType(o, 'creature')) {
           if (s.other && sid === id) continue;
           if (s.scope === 'you' && src.controller !== o.controller) continue;
+          if (s.word === 'chosen') { if (!src.chosen || !hasSub(o, src.chosen)) continue; add(s); continue; }
           if (s.word && s.word !== 'all') {
             const cw = Object.entries(COLOR_WORD).find(([, w]) => w === s.word)?.[0];
             if (cw ? !d.colors.includes(cw) : !hasSub(o, s.word) && !(s.word === 'nonblack' && !d.colors.includes('B'))) continue;
@@ -242,7 +262,7 @@ const Engine = (() => {
       queueTrigger(G, id, 'leaves');
       removeFromCombat(G, id);
       G.effects = G.effects.filter((e) => e.id !== id);
-      Object.assign(o, { damagedBy: [], tapped: false, damage: 0, deathtouched: false, attachedTo: null, regen: 0, counters: { p1: 0, m1: 0 }, echoDue: false, used: {} });
+      Object.assign(o, { animated: null, tempControl: null, chosen: null, damagedBy: [], tapped: false, damage: 0, deathtouched: false, attachedTo: null, regen: 0, counters: { p1: 0, m1: 0 }, echoDue: false, used: {} });
       o.controller = o.owner;
       if (to === 'graveyard') sfx(G, 'destroy');
       if (to === 'exile') sfx(G, 'exile');
@@ -257,6 +277,8 @@ const Engine = (() => {
       o.since = G.turn;
       o.tapped = tapped || o.def.entersTapped;
       if (o.def.echo) o.echoDue = true;
+      o.baseController = o.controller;
+      if (o.def.chooseOnEtb) G.choices.push({ type: 'chooseWord', player: o.controller, id, what: o.def.chooseOnEtb, reason: o.card.name });
       if (o.def.etbCounters) o.counters.p1 += o.def.etbCounters;
       if (o.def.etbNamed) for (const [k, n] of Object.entries(o.def.etbNamed)) o.counters[k] = (o.counters[k] ?? 0) + n;
       G.battlefield.push(id);
@@ -283,6 +305,13 @@ const Engine = (() => {
       delete G.combat.attackers[id];
       for (const [b, a] of Object.entries(G.combat.blocks)) if (Number(b) === id || a === id) delete G.combat.blocks[b];
     }
+  }
+
+  // 選べるクリーチャー・タイプ（両方のデッキに出てくるもの）
+  function creatureTypes(G) {
+    const set = new Set();
+    for (const o of Object.values(G.objects)) if (o.def.types.includes('creature')) for (const t of o.def.subtypes) set.add(t.toLowerCase());
+    return [...set].sort();
   }
 
   // 手札から捨てる（「捨てるたび」の誘発）
@@ -358,7 +387,7 @@ const Engine = (() => {
       const o = obj(G, id);
       if (o.tapped) continue;
       if (isType(o, 'creature') && isSick(G, id)) continue;
-      o.def.activated.forEach((a, i) => {
+      abilitiesOf(G, id).forEach((a, i) => {
         if (!a.mana || !a.cost.tap || a.cost.mana || a.cost.sacSelf || a.cost.life || a.cost.discard || a.cost.sacType) return;
         const m = a.mana;
         out.push({ id, index: i, choices: m.fixed ?? m.choices, amount: m.amount, fixed: !!m.fixed, land: isType(o, 'land') });
@@ -471,7 +500,7 @@ const Engine = (() => {
     const out = [];
     const rel = (q) => (q === p ? 'me' : 'opp');
     if (spec.kind === 'player' || spec.kind === 'any') {
-      for (const q of [0, 1]) if ((spec.players ?? ['me', 'opp']).includes(rel(q))) out.push({ player: q });
+      for (const q of [0, 1]) if ((spec.players ?? ['me', 'opp']).includes(rel(q)) && !playerStatic(G, q, 'shroud')) out.push({ player: q });
     }
     if (spec.kind === 'card' || spec.kind === 'any') {
       for (const id of G.battlefield) if (legalCard(G, p, spec, id, srcId, srcColors)) out.push({ obj: id });
@@ -541,6 +570,7 @@ const Engine = (() => {
 
   function stillLegal(G, item, spec, t) {
     if (!t) return false;
+    if (t.divide) return t.divide.some((x) => stillLegal(G, item, { ...spec, divided: null }, x));
     if (t.player != null) {
       const who = t.player === item.controller ? 'me' : 'opp';
       return !G.players[t.player].lost && (spec.kind === 'player' || spec.kind === 'any') && (spec.players ?? ['me', 'opp']).includes(who);
@@ -573,6 +603,12 @@ const Engine = (() => {
 
   function triggerCondOk(G, o, cond, evt) {
     if (!cond) return true;
+    if (cond.ifUntapped && o.tapped) return false;
+    if (cond.otherNot && evt.subject != null) {
+      const s = obj(G, evt.subject);
+      const col = { white: 'W', blue: 'U', black: 'B', red: 'R', green: 'G' }[cond.otherNot];
+      if (col ? s.def.colors.includes(col) : hasSub(s, cond.otherNot)) return false;
+    }
     if (cond.other && evt.subject === o.id) return false;
     if (cond.who && evt.subject != null && evt.subject !== o.id) {
       const s = obj(G, evt.subject);
@@ -666,6 +702,18 @@ const Engine = (() => {
           continue;
         }
       }
+      // コントロール：「エンチャントしているものをコントロールする」オーラ → このターンだけ → 元のコントローラー
+      {
+        const aura = G.battlefield.find((sid) => obj(G, sid).attachedTo === id && obj(G, sid).def.statics.some((st) => st.kind === 'attached' && st.control));
+        const want = aura != null ? obj(G, aura).controller : o.tempControl ?? o.baseController ?? o.controller;
+        if (want !== o.controller) {
+          removeFromCombat(G, id);
+          o.controller = want;
+          o.since = G.turn;
+          log(G, want, `${o.card.name}のコントロールを得た`);
+          changed = true;
+        }
+      }
       // 「〜をコントロールしていないとき、これを生け贄に捧げる」
       if (o.def.sacIfNo && !bf(G, o.controller).some((x) => hasSub(obj(G, x), o.def.sacIfNo))) {
         move(G, id, 'graveyard');
@@ -701,6 +749,9 @@ const Engine = (() => {
     G.pending = null;
     G.priority = null;
   }
+
+  // プレイヤーの常在型能力（「あなたは被覆を持つ」「手札の上限がない」）
+  const playerStatic = (G, p, key) => bf(G, p).some((id) => obj(G, id).def.playerStatics?.[key]) || (key === 'shroud' && G.players[p].shroudEOT);
 
   // ---------- ターンの進行 ----------
 
@@ -743,6 +794,7 @@ const Engine = (() => {
       case 'draw':
         if (!(G.turn === 1)) draw(G, p, 1);
         for (const id of bf(G, p)) queueTrigger(G, id, 'drawstep');
+        queueAll(G, 'eachDrawstep', { player: p });
         return givePriority(G);
       case 'attackers': {
         const can = bf(G, p).filter((id) => canAttack(G, id));
@@ -766,13 +818,22 @@ const Engine = (() => {
         if (!G.combat || !Object.keys(G.combat.attackers).length) return;
         combatDamage(G, false);
         return givePriority(G);
+      case 'endcombat':
+        // 「戦闘の終わりに」破壊・生け贄
+        for (const d of G.delayed ?? []) {
+          if (!onBf(G, d.id)) continue;
+          if (d.what === 'destroy') destroy(G, d.id);
+          else move(G, d.id, 'graveyard');
+        }
+        G.delayed = [];
+        return givePriority(G);
       case 'end':
         for (const id of bf(G, p)) queueTrigger(G, id, 'endstep');
         queueAll(G, 'eachEndstep', { player: p });
         return givePriority(G);
       case 'cleanup': {
         const over = G.players[p].hand.length - MAX_HAND;
-        if (over > 0) G.choices.push({ type: 'discard', player: p, n: over, reason: '手札の上限' });
+        if (over > 0 && !playerStatic(G, p, 'noMaxHand')) G.choices.push({ type: 'discard', player: p, n: over, reason: '手札の上限' });
         return;
       }
       default:
@@ -785,8 +846,15 @@ const Engine = (() => {
     if (G.step === 'endcombat' || (G.step === 'attackers' && !G.combat)) {
       for (const id of G.battlefield) { obj(G, id).attacking = false; obj(G, id).blocking = null; }
     }
+    if (G.step === 'endcombat') for (const id of G.battlefield) if (obj(G, id).animated?.until === 'combat') obj(G, id).animated = null;
     if (G.step === 'cleanup') {
-      for (const id of G.battlefield) { const o = obj(G, id); o.damage = 0; o.deathtouched = false; o.regen = 0; o.prevent = 0; o.damagedBy = []; }
+      for (const id of G.battlefield) {
+        const o = obj(G, id);
+        o.damage = 0; o.deathtouched = false; o.regen = 0; o.prevent = 0; o.damagedBy = [];
+        if (o.animated && o.animated.until) o.animated = null;
+        o.tempControl = null;
+      }
+      for (const pl of G.players) pl.shroudEOT = false;
       for (const pl of G.players) { pl.prevent = 0; pl.cop = []; }
       G.effects = G.effects.filter((e) => e.until !== 'eot');
       G.fog = false;
@@ -801,7 +869,7 @@ const Engine = (() => {
       i++;
       if (i >= STEPS.length) {
         G.turn++;
-        G.active = other(G.active);
+        G.active = G.extraTurns?.length ? G.extraTurns.shift() : other(G.active);
         G.step = 'untap';
         sfx(G, 'endturn');
         break;
@@ -858,6 +926,15 @@ const Engine = (() => {
       // 選ぶ余地がなければそのまま
       if (options.length === n) { for (const id of options) move(G, id, 'graveyard'); return; }
       G.pending = { ...c, n, options };
+    } else if (c.type === 'sacUnlessOther') {
+      if (!onBf(G, c.id)) return;
+      const options = c.how === 'discard' ? G.players[c.player].hand.filter((h) => isType(obj(G, h), c.what) || c.what === 'card')
+        : sacOptions(G, c.player, c.what).filter((x) => x !== c.id);
+      if (options.length < c.n) { log(G, c.player, `${c.reason}：生け贄に捧げた`); move(G, c.id, 'graveyard'); return; }
+      G.pending = { ...c, options };
+    } else if (c.type === 'chooseWord') {
+      if (!onBf(G, c.id)) return;
+      G.pending = { ...c, options: c.what === 'color' ? ['white', 'blue', 'black', 'red', 'green'] : creatureTypes(G) };
     } else if (c.type === 'returnOwn') {
       const options = sacOptions(G, c.player, c.what);
       if (!options.length) return;
@@ -895,6 +972,15 @@ const Engine = (() => {
     const c = ch(G, id);
     if (c.kw.has('defender') || c.cantAttack || isSick(G, id)) return false;
     if (c.attackNeeds && !bf(G, other(o.controller)).some((x) => hasSub(obj(G, x), c.attackNeeds))) return false;
+    // 「飛行を持たないクリーチャーはあなたを攻撃できない」（選んだ色だけ、など）
+    for (const mid of bf(G, other(o.controller))) {
+      const m = obj(G, mid);
+      for (const st of m.def.statics) {
+        if (st.kind !== 'moat') continue;
+        if (st.chosenColor && !(m.chosen && c.colors.includes(Object.entries(COLOR_WORD).find(([, w]) => w === m.chosen)?.[0]))) continue;
+        if (st.noFlying && !c.kw.has('flying')) return false;
+      }
+    }
     return true;
   }
 
@@ -906,6 +992,7 @@ const Engine = (() => {
     const bc = ch(G, blocker);
     const ac = ch(G, attacker);
     if (bc.cantBlock || ac.unblockable) return false;
+    if (ac.unblockableAlone && Object.keys(G.combat?.attackers ?? {}).length === 1) return false;
     if (ac.kw.has('flying') && !bc.kw.has('flying') && !bc.kw.has('reach')) return false;
     if (ac.kw.has('shadow') !== bc.kw.has('shadow')) return false;
     if (ac.kw.has('fear') && !isType(b, 'artifact') && !bc.colors.includes('B')) return false;
@@ -925,6 +1012,7 @@ const Engine = (() => {
   function declareAttackers(G, p, ids) {
     const uniq = [...new Set(ids.map(Number))];
     for (const id of uniq) if (!canAttack(G, id)) fail(`${nameOf(G, id)}は攻撃できません`);
+    if (uniq.length === 1 && (ch(G, uniq[0]).notAlone || ch(G, uniq[0]).notAloneAttack)) fail(`${nameOf(G, uniq[0])}は単独では攻撃できません`);
     G.combat = { attackers: {}, blocks: {}, blocked: {} };
     for (const id of uniq) {
       const o = obj(G, id);
@@ -936,6 +1024,7 @@ const Engine = (() => {
     if (uniq.length) sfx(G, 'attack');
     else { G.combat = null; log(G, p, '攻撃しない'); }
     for (const id of uniq) queueTrigger(G, id, 'attacks');
+    if (uniq.length === 1) queueTrigger(G, uniq[0], 'attacksAlone');
   }
 
   function declareBlockers(G, p, blocks) {
@@ -951,12 +1040,16 @@ const Engine = (() => {
       if (n && ac.maxBlockers && n > ac.maxBlockers) fail(`${nameOf(G, a)}は${ac.maxBlockers}体までしかブロックできません`);
       if (n && ac.minBlockers && n < ac.minBlockers) fail(`${nameOf(G, a)}は${ac.minBlockers}体以上でないとブロックできません`);
     }
+    if (pairs.length === 1 && (ch(G, pairs[0][0]).notAlone || ch(G, pairs[0][0]).notAloneBlock)) fail(`${nameOf(G, pairs[0][0])}は単独ではブロックできません`);
     for (const [b, a] of pairs) {
       G.combat.blocks[b] = a;
       G.combat.blocked[a] = true;
       obj(G, b).blocking = a;
       log(G, p, `${nameOf(G, b)}で${nameOf(G, a)}をブロック`);
-      queueTrigger(G, b, 'blocks');
+      queueTrigger(G, b, 'blocks', { subject: a });
+      queueTrigger(G, b, 'blocksOrBlockedBy', { subject: a });
+      queueTrigger(G, a, 'blockedBy', { subject: b });
+      queueTrigger(G, a, 'blocksOrBlockedBy', { subject: b });
     }
     for (const a of new Set(pairs.map(([, x]) => x))) queueTrigger(G, a, 'becomesBlocked');
     if (!pairs.length) log(G, p, 'ブロックしない');
@@ -1001,6 +1094,11 @@ const Engine = (() => {
       if (ac.p <= 0) continue;
       const blockers = Object.entries(c.blocks).filter(([, x]) => x === a).map(([b]) => Number(b)).filter((b) => onBf(G, b));
       if (!c.blocked[a]) { events.push({ to: { player: c.attackers[a] }, n: ac.p, src: a }); continue; }
+      // 「ブロックされていないかのように割り振ってもよい」：ブロックしたものを倒せないならプレイヤーへ
+      if (ac.assignUnblocked) {
+        const bs = Object.entries(c.blocks).filter(([, x]) => x === a).map(([b]) => Number(b)).filter((b) => onBf(G, b));
+        if (!bs.some((b) => ch(G, b).t - obj(G, b).damage <= ac.p)) { events.push({ to: { player: c.attackers[a] }, n: ac.p, src: a }); continue; }
+      }
       if (!blockers.length) {
         if (ac.kw.has('trample')) events.push({ to: { player: c.attackers[a] }, n: ac.p, src: a });
         continue;
@@ -1078,6 +1176,7 @@ const Engine = (() => {
     }
     let cost = flashback ? o.def.flashback : o.def.manaCost ?? `{${o.def.cmc}}`;
     if (kicked && o.def.kicker) cost = `${cost ?? ''}${o.def.kicker}`;
+    cost = adjustCost(G, p, o, cost);
     const x = /\{X\}/.test(cost ?? '');
     const specs = spellSpecs(o, mode, kicked);
     const srcColors = o.def.colors;
@@ -1091,6 +1190,34 @@ const Engine = (() => {
     if (!canPay(G, p, cost, 0)) return { ok: false, reason: `マナが足りません（${cost || '0'}）`, specs, x, cost, from };
     const canKick = !!o.def.kicker && !kicked && canPay(G, p, `${cost ?? ''}${o.def.kicker}`, 0);
     return { ok: true, specs, x, cost, from, maxX: x ? maxX(G, p, cost) : 0, flashback, modes, kicker: o.def.kicker, canKick, addCost: ac ?? null };
+  }
+
+  // 「〜の呪文は{1}少なく／多くなる」を当てたコスト
+  function adjustCost(G, p, o, cost) {
+    let delta = 0;
+    for (const sid of G.battlefield) {
+      const src = obj(G, sid);
+      for (const st of src.def.statics) {
+        if (st.kind !== 'costMod') continue;
+        if (st.who === 'you' ? src.controller !== p : src.controller === p) continue;
+        const hit = st.words.some((w) => {
+          const col = { white: 'W', blue: 'U', black: 'B', red: 'R', green: 'G' }[w];
+          if (col) return o.def.colors.includes(col);
+          if (w === 'noncreature') return !isType(o, 'creature');
+          if (['creature', 'artifact', 'enchantment', 'instant', 'sorcery'].includes(w)) return isType(o, w) && (!st.chosenType || (src.chosen && hasSub(o, src.chosen)));
+          return hasSub(o, w);
+        });
+        if (hit) delta += st.delta;
+      }
+    }
+    if (!delta) return cost;
+    const c = R().parseCost(cost ?? '', 0);
+    const generic = Math.max(0, c.generic + delta);
+    let out = generic ? `{${generic}}` : '';
+    for (let i = 0; i < c.x; i++) out += '{X}';
+    for (const k of ['W', 'U', 'B', 'R', 'G', 'C']) out += `{${k}}`.repeat(c[k]);
+    for (const h of c.hybrid) out += `{${h.join('/')}}`;
+    return out || '{0}';
   }
 
   // 呪文の効果（モード・キッカーで選ぶ）
@@ -1112,11 +1239,21 @@ const Engine = (() => {
     return x;
   }
 
-  function checkTargets(G, p, specs, targets, srcId, srcColors) {
+  function checkTargets(G, p, specs, targets, srcId, srcColors, total = null) {
     specs.forEach((s, i) => {
       if (!s) return;
       const t = targets?.[i];
       if (!t) fail('対象を選んでください');
+      if (s.divided) {
+        // 割り振るダメージ：{ divide: [{ 対象, n }] }。対象は別々で、合計が全体の数
+        const parts = t.divide ?? [];
+        if (!parts.length || parts.length > s.divided.max) fail('対象を選んでください');
+        const cands = targetsFor(G, p, s, srcId, srcColors);
+        if (!parts.every((x) => cands.some((c) => sameTarget(c, x)) && x.n >= 1)) fail('その対象は選べません');
+        if (new Set(parts.map((x) => JSON.stringify({ player: x.player, obj: x.obj }))).size !== parts.length) fail('同じ対象は1回だけ選べます');
+        if (total != null && parts.reduce((a, x) => a + x.n, 0) !== total) fail(`ダメージの合計を${total}にしてください`);
+        return;
+      }
       const ok = targetsFor(G, p, s, srcId, srcColors).some((c) => sameTarget(c, t));
       if (!ok) fail('その対象は選べません');
     });
@@ -1129,7 +1266,8 @@ const Engine = (() => {
     if (info.needMode) fail('モードを選んでください');
     const o = obj(G, id);
     x = info.x ? Math.max(0, Math.min(Number(x) || 0, info.maxX)) : 0;
-    checkTargets(G, p, info.specs, targets, null, o.def.colors);
+    const divFx = spellEffects(o, mode, kicked).find((f) => f.target?.divided);
+    checkTargets(G, p, info.specs, targets, null, o.def.colors, divFx ? (divFx.n === 'X' ? x : divFx.n) : null);
     pay(G, p, info.cost, x, { exclude: id });
     // 追加のコスト
     let sacPower = 0;
@@ -1167,15 +1305,15 @@ const Engine = (() => {
   function activations(G, p, id) {
     const o = obj(G, id);
     if (!o) return [];
-    return o.def.activated.map((a, index) => {
+    return abilitiesOf(G, id).map((a, index) => {
       const r = activationInfo(G, p, id, index);
-      return { index, text: a.text, mana: !!a.mana, cycling: !!a.cycling, ...r };
+      return { index, text: a.text, mana: !!a.mana, cycling: !!a.cycling, ability: a, ...r };
     });
   }
 
   function activationInfo(G, p, id, index) {
     const o = obj(G, id);
-    const a = o?.def.activated[index];
+    const a = abilitiesOf(G, id)[index];
     if (!a) return { ok: false, reason: '能力がありません' };
     if (a.fromHand ? !(o.zone === 'hand' && o.owner === p) : !(onBf(G, id) && o.controller === p)) return { ok: false, reason: a.fromHand ? '手札から起動します' : '戦場にありません' };
     if (G.priority !== p && !(a.mana && G.pending?.player === p)) return { ok: false, reason: '優先権がありません' };
@@ -1190,6 +1328,10 @@ const Engine = (() => {
     if (c.removeNamed && (o.counters[c.removeNamed] ?? 0) < (c.removeNamedN ?? 1)) return { ok: false, reason: 'カウンターがありません' };
     if (c.tapOther && !tapOptions(G, p, c.tapOther, id).length) return { ok: false, reason: 'タップできるものがありません' };
     if (a.upkeep && !(G.step === 'upkeep' && G.active === p)) return { ok: false, reason: '自分のアップキープにだけ起動できます' };
+    if (a.combat && !['begincombat', 'attackers', 'blockers', 'firststrike', 'damage', 'endcombat'].includes(G.step)) return { ok: false, reason: '戦闘中にだけ起動できます' };
+    if (a.endcombat && G.step !== 'endcombat') return { ok: false, reason: '戦闘終了ステップにだけ起動できます' };
+    if (a.yourTurn && G.active !== p) return { ok: false, reason: '自分のターンにだけ起動できます' };
+    if (a.ifGrave && G.players[p].graveyard.length < a.ifGrave) return { ok: false, reason: '墓地のカードが足りません（スレッショルド）' };
     if (c.sacType && !sacOptions(G, p, c.sacType).length) return { ok: false, reason: '生け贄に捧げるものがありません' };
     const specs = a.effects.map((f) => (f.type === 'equip' ? { ...f.target, notSelf: true } : specOf(f)));
     for (const s of specs) if (s && !targetsFor(G, p, s, id, o.def.colors).length) return { ok: false, reason: '対象がありません' };
@@ -1219,7 +1361,7 @@ const Engine = (() => {
     const info = activationInfo(G, p, id, index);
     if (!info.ok) fail(info.reason);
     const o = obj(G, id);
-    const a = o.def.activated[index];
+    const a = abilitiesOf(G, id)[index];
     const c = a.cost;
     checkTargets(G, p, info.specs, targets, id, o.def.colors);
     x = info.x ? Math.max(0, Math.min(Number(x) || 0, info.maxX)) : 0;
@@ -1391,6 +1533,7 @@ const Engine = (() => {
     };
     switch (fx.type) {
       case 'damage':
+        if (t?.divide) { for (const part of t.divide) if (stillLegal(G, item, { ...fx.target, divided: null }, part)) damageTo(part, part.n); break; }
         if (fx.target.auto) for (const w of fx.target.players) damageTo({ player: rel(w) }, val(fx.n));
         else if (t) damageTo(t, val(fx.n));
         break;
@@ -1426,7 +1569,11 @@ const Engine = (() => {
         if (t?.obj != null) { log(G, p, `${by}：${nameOf(G, t.obj)}を手札に戻した`); move(G, t.obj, 'hand', { silent: true }); }
         break;
       case 'bounceAll':
-        for (const id of [...G.battlefield]) if (matchFilter(G, id, fx.filter)) move(G, id, 'hand', { silent: true });
+        for (const id of [...G.battlefield]) {
+          if (fx.other && id === src) continue;
+          if (fx.filter.side && (fx.filter.side === 'me') !== (obj(G, id).controller === p)) continue;
+          if (matchFilter(G, id, fx.filter)) move(G, id, 'hand', { silent: true });
+        }
         log(G, p, `${by}：すべて手札に戻した`);
         break;
       case 'tap':
@@ -1527,6 +1674,59 @@ const Engine = (() => {
       case 'reorder': {
         const top = G.players[p].library.slice(0, val(fx.n));
         if (top.length > 1) G.choices.push({ type: 'reorder', player: p, options: top, reason: by });
+        break;
+      }
+      case 'sacUnlessOther':
+        if (onBf(G, src)) G.choices.push({ type: 'sacUnlessOther', player: p, id: src, how: fx.how, n: fx.n, what: fx.what, reason: by });
+        break;
+      case 'exileSameName': {
+        const tgt = item.targets.find((a) => a?.obj != null || a?.stack != null);
+        const base = tgt?.obj != null ? obj(G, tgt.obj) : null;
+        if (!base) break;
+        const name = base.def.name;
+        const owner = base.owner;
+        for (const z of ['graveyard', 'hand', 'library']) for (const id of [...G.players[owner][z]]) if (obj(G, id).def.name === name) move(G, id, 'exile', { silent: true });
+        shuffle(G, G.players[owner].library);
+        log(G, p, `${by}：${base.card.name}と同じ名前のカードをすべて追放した`);
+        break;
+      }
+      case 'shuffleGraveIn': {
+        const w = fx.target.auto ? p : t?.player;
+        if (w == null) break;
+        for (const id of [...G.players[w].graveyard]) move(G, id, 'library', { silent: true });
+        shuffle(G, G.players[w].library);
+        break;
+      }
+      case 'millHalf': if (t?.player != null) for (const id of G.players[t.player].library.slice(0, Math.floor(G.players[t.player].library.length / 2))) move(G, id, 'graveyard', { silent: true }); break;
+      case 'bounceAllOwned': if (t?.player != null) for (const id of [...G.battlefield]) if (obj(G, id).owner === t.player && isType(obj(G, id), fx.what)) move(G, id, 'hand'); break;
+      case 'animate': {
+        const id = src;
+        if (!onBf(G, id)) break;
+        const o = obj(G, id);
+        o.animated = { p: fx.p === 'X' ? x : fx.p, t: fx.t === 'X' ? x : fx.t, kw: fx.kw, colors: fx.colors, artifact: fx.artifact, subtypes: fx.subtypes, until: fx.until };
+        log(G, p, `${o.card.name}は${o.animated.p}/${o.animated.t}のクリーチャーになった`);
+        break;
+      }
+      case 'threaten':
+        if (t?.obj != null && onBf(G, t.obj)) {
+          const o = obj(G, t.obj);
+          o.tapped = false;
+          o.tempControl = p;
+          G.effects.push({ id: t.obj, kw: ['haste'], until: 'eot' });
+          log(G, p, `${by}：${o.card.name}のコントロールをこのターン得た`);
+        }
+        break;
+      case 'giveControl': if (onBf(G, src) && t?.player != null) obj(G, src).baseController = t.player; break;
+      case 'extraTurn': {
+        const who = fx.target.auto ? p : t?.player;
+        if (who != null) { G.extraTurns = [...(G.extraTurns ?? []), ...Array(fx.n).fill(who)]; log(G, who, `${by}：追加のターンを得た`); }
+        break;
+      }
+      case 'playerShroud': G.players[p].shroudEOT = true; break;
+      case 'drawPlayer': if (t?.player != null) draw(G, t.player, val(fx.n)); break;
+      case 'delayed': {
+        const id = fx.self ? src : t?.obj;
+        if (id != null) G.delayed = [...(G.delayed ?? []), { what: fx.what, id }];
         break;
       }
       case 'tapAll': for (const id of G.battlefield) if (!(fx.other && id === src) && matchFilter(G, id, fx.filter)) obj(G, id).tapped = true; break;
@@ -1670,7 +1870,7 @@ const Engine = (() => {
       if (pend.player !== p) fail('相手の選択を待っています');
       return answerPending(G, p, pend, a);
     }
-    if (pend && a.type === 'activate' && !obj(G, a.id)?.def.activated[a.index]?.mana && !obj(G, a.id)?.def.activated[a.index]?.manaLike) fail('先に選択をしてください');
+    if (pend && a.type === 'activate' && !abilitiesOf(G, a.id)[a.index]?.mana && !abilitiesOf(G, a.id)[a.index]?.manaLike) fail('先に選択をしてください');
     if (!pend && G.priority !== p && a.type !== 'activate') fail('優先権がありません');
     switch (a.type) {
       case 'pass': {
@@ -1692,7 +1892,7 @@ const Engine = (() => {
       case 'playLand': playLand(G, p, a.id); break;
       case 'cast': cast(G, p, a); break;
       case 'activate': {
-        const ab = obj(G, a.id)?.def.activated[a.index];
+        const ab = abilitiesOf(G, a.id)[a.index];
         const isMana = ab?.mana || ab?.manaLike;
         activate(G, p, a);
         if (isMana) return; // 優先権は動かない
@@ -1812,6 +2012,28 @@ const Engine = (() => {
         log(G, p, `上から${pend.options.length}枚を並べ替えた`);
         return;
       }
+      case 'sacUnlessOther': {
+        G.pending = null;
+        const ids = (a.ids ?? []).map(Number);
+        if (a.type === 'choose' && ids.length === pend.n && new Set(ids).size === ids.length && ids.every((x) => pend.options.includes(x))) {
+          for (const x of ids) {
+            if (pend.how === 'discard') discardCard(G, x);
+            else if (pend.how === 'return') move(G, x, 'hand');
+            else move(G, x, 'graveyard');
+          }
+          return;
+        }
+        log(G, p, `${pend.reason}：生け贄に捧げた`);
+        move(G, pend.id, 'graveyard');
+        return;
+      }
+      case 'chooseWord': {
+        if (a.type !== 'word' || !pend.options.includes(a.value)) fail('選んでください');
+        G.pending = null;
+        if (onBf(G, pend.id)) obj(G, pend.id).chosen = a.value;
+        log(G, p, `${pend.reason}：${a.value}を選んだ`);
+        return;
+      }
       case 'returnOwn': {
         const id = Number(a.ids?.[0]);
         if (a.type !== 'choose' || !pend.options.includes(id)) fail('手札に戻すものを選んでください');
@@ -1909,7 +2131,7 @@ const Engine = (() => {
     }
     for (const id of [...bf(G, p), ...pl.hand]) {
       for (const a of activations(G, p, id)) {
-        if (a.ok && !a.mana && (!instantOnly || !obj(G, id).def.activated[a.index].sorcery)) return true;
+        if (a.ok && !a.mana && (!instantOnly || !abilitiesOf(G, id)[a.index].sorcery)) return true;
       }
     }
     return false;
@@ -1939,15 +2161,18 @@ const Engine = (() => {
       'searchLand', 'search', 'counter', 'regen', 'addMana', 'sacSelf', 'sacUnless', 'fog', 'regrow', 'regrowSelf', 'bounceSelf', 'untapSelf', 'tapSelf',
       'tapOrUntap', 'prevent', 'preventBy', 'gainTargetController', 'sacrifice', 'discardHand', 'discardRandom', 'reveal', 'chooseFromHand',
       'untapLands', 'tapAllOpp', 'equip', 'pumpAttached', 'bounceAttached', 'addNamed', 'sacIfNoCounters', 'sacAll', 'untapLandsN', 'exileGrave',
-      'exileGraveAll', 'scry', 'lookPick', 'reorder', 'payThen', 'tapAll', 'unblockable', 'cop', 'payOr', 'topdeck', 'returnOwn'],
-    triggers: ['drawCard', 'discard', 'damagedDies', 'etb', 'dies', 'etbOrDies', 'blocksOrBlocked', 'leaves', 'upkeep', 'eachUpkeep', 'endstep', 'eachEndstep', 'drawstep', 'attacks', 'blocks', 'attacksOrBlocks', 'becomesBlocked',
+      'exileGraveAll', 'scry', 'lookPick', 'reorder', 'payThen', 'tapAll', 'unblockable', 'cop', 'payOr', 'topdeck', 'returnOwn',
+      'animate', 'threaten', 'giveControl', 'extraTurn', 'playerShroud', 'drawPlayer', 'delayed', 'sacUnlessOther', 'exileSameName', 'shuffleGraveIn',
+      'millHalf', 'bounceAllOwned'],
+    triggers: ['attacksAlone', 'blocksOrBlockedBy', 'blockedBy', 'eachDrawstep', 'drawCard', 'discard', 'damagedDies', 'etb', 'dies', 'etbOrDies', 'blocksOrBlocked', 'leaves', 'upkeep', 'eachUpkeep', 'endstep', 'eachEndstep', 'drawstep', 'attacks', 'blocks', 'attacksOrBlocks', 'becomesBlocked',
       'combatDamagePlayer', 'dealsDamagePlayer', 'dealtDamage', 'creatureEnters', 'creatureDies', 'cast', 'cycled'],
-    statics: ['self', 'attached', 'lord'],
+    statics: ['self', 'attached', 'lord', 'costMod', 'moat'],
   };
   // 定義のうち、このエンジンで扱えないもの（なければ空）
   function unsupported(def) {
     const out = [];
-    let fxs = [...def.spell, ...(def.modes ?? []).flat(), ...def.activated.flatMap((a) => a.effects), ...def.triggers.flatMap((t) => t.effects)];
+    const grants = def.statics.flatMap((st) => st.grants ?? []);
+    let fxs = [...def.spell, ...(def.modes ?? []).flat(), ...[...def.activated, ...grants].flatMap((a) => a.effects), ...def.triggers.flatMap((t) => t.effects)];
     fxs = [...fxs, ...fxs.flatMap((f) => f.effects ?? [])];
     for (const f of fxs) if (f.sameTarget && f.type !== 'pump') out.push(`sameTarget:${f.type}`);
     for (const f of fxs) if (!SUPPORTED.effects.includes(f.type)) out.push(`effect:${f.type}`);
@@ -1957,7 +2182,7 @@ const Engine = (() => {
   }
 
   return {
-    SUPPORTED, unsupported, countOf,
+    SUPPORTED, unsupported, countOf, abilitiesOf,
     STEPS, STEP_NAMES, create, perform, needs, run,
     ch, cv, isSick, canAttack, canBlock, castInfo, activations, targetsFor, hasPlayable, planPayment, canPay, manaSources, maxX,
     sorceryTiming, isType: (G, id, t) => isType(obj(G, id), t), view, specOf, spellSpecs,

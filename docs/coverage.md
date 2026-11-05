@@ -1,6 +1,6 @@
 # 旧枠モダンの自動処理の対応状況
 
-全1016種類：すべて自動 665（65.5%）・一部だけ 112・できない 239（2026-11-05 時点。`node tools/coverage.js --write` で更新）
+全1016種類：すべて自動 730（71.9%）・一部だけ 93・できない 193（2026-11-05 時点。`node tools/coverage.js --write` で更新）
 
 ## 読み取れない文があるカード
 
@@ -9,14 +9,10 @@
 | Abundance | If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this way on the bottom of your library in any order. |
 | Academy Researchers | When this enters, you may put an Aura card from your hand onto the battlefield attached to this. |
 | Agonizing Memories | Look at target player's hand and choose two cards from it. Put them on top of that player's library in any order. |
-| Annex | You control enchanted land. |
-| Arc Lightning | this deals 3 damage divided as you choose among one, two, or three targets. |
-| Arcane Teachings | Enchanted creature gets +2/+2 and has "{T}: this deals 1 damage to any target." |
 | Arena | {3}, {T}: Tap target creature you control and target creature of an opponent's choice they control. Those creatures fight each other. |
 | Arrest | Enchanted creature can't attack or block, and its activated abilities can't be activated. |
 | Assault // Battery | Assault deals 2 damage to any target. |
 | Aura Graft | Gain control of target Aura that's attached to a permanent. Attach it to another permanent it can enchant. |
-| Aura of Silence | Artifact and enchantment spells your opponents cast cost {2} more to cast. |
 | Avatar of Hope | If you have 3 or less life, this costs {6} less to cast. |
 | Avatar of Might | If an opponent controls at least four more creatures than you, this costs {6} less to cast. |
 | Avatar of Woe | If there are ten or more creature cards total in all graveyards, this costs {6} less to cast. |
@@ -24,7 +20,6 @@
 | Avoid Fate | Counter target instant or Aura spell that targets a permanent you control. |
 | Balance of Power | If target opponent has more cards in hand than you, draw cards equal to the difference. |
 | Baleful Stare | Target opponent reveals their hand. You draw a card for each Mountain and red card in it. |
-| Barbarian Ring | Threshold — {R}, {T}, Sacrifice this: It deals 2 damage to any target. Activate only if there are seven or more cards in your graveyard. |
 | Battle of Wits | At the beginning of your upkeep, if you have 200 or more cards in your library, you win the game. |
 | Battle Screech | Flashback—Tap three untapped white creatures you control. |
 | Biorhythm | Each player's life total becomes the number of creatures they control. |
@@ -33,18 +28,16 @@
 | Blood Moon | Nonbasic lands are Mountains. |
 | Booby Trap | As this enters, choose an opponent and a card name other than a basic land card name.<br>The chosen player reveals each card they draw.<br>When the chosen player draws a card with the chosen name, sacrifice this. If you do, this deals 10 damage to that player. |
 | Braids, Cabal Minion | At the beginning of each player's upkeep, that player sacrifices an artifact, creature, or land of their choice. |
-| Brass Herald | As this enters, choose a creature type.<br>When this enters, reveal the top four cards of your library. Put all creature cards of the chosen type revealed this way into your hand and the rest on the bottom of your library in any order.<br>Creatures of the chosen type get +1/+1. |
+| Brass Herald | When this enters, reveal the top four cards of your library. Put all creature cards of the chosen type revealed this way into your hand and the rest on the bottom of your library in any order. |
 | Bribery | Search target opponent's library for a creature card and put that card onto the battlefield under your control. Then that player shuffles. |
 | Browbeat | Any player may have this deal 5 damage to them. If no one does, target player draws three cards. |
 | Brown Ouphe | {1}{G}, {T}: Counter target activated ability from an artifact source. |
 | Call of the Wild | {2}{G}{G}: Reveal the top card of your library. If it's a creature card, put it onto the battlefield. Otherwise, put it into your graveyard. |
 | Call to the Grave | At the beginning of each player's upkeep, that player sacrifices a non-Zombie creature of their choice.<br>At the beginning of the end step, if no creatures are on the battlefield, sacrifice this. |
-| Caustic Tar | Enchanted land has "{T}: Target player loses 3 life." |
 | Celestial Dawn | Lands you control are Plains.<br>Nonland permanents you control are white. The same is true for spells you control and nonland cards you own that aren't on the battlefield.<br>You may spend white mana as though it were mana of any color. You may spend other mana only as though it were colorless mana. |
 | Cephalid Coliseum | Threshold — {U}, {T}, Sacrifice this: Target player draws three cards, then discards three cards. Activate only if there are seven or more cards in your graveyard. |
 | Cephalid Constable | Whenever this deals combat damage to a player, return up to that many target permanents that player controls to their owner's hand. |
 | Chance Encounter | Whenever you win a coin flip, put a luck counter on this.<br>At the beginning of your upkeep, if this has ten or more luck counters on it, you win the game. |
-| Chimeric Staff | {X}: this becomes an X/X Construct artifact creature until end of turn. |
 | Choke | Islands don't untap during their controllers' untap steps. |
 | Cinder Wall | When this blocks, destroy it at end of combat. |
 | Citanul Flute | {X}, {T}: Search your library for a creature card with mana value X or less, reveal it, put it into your hand, then shuffle. |
@@ -53,36 +46,28 @@
 | Coalition Victory | You win the game if you control a land of each basic land type and a creature of each color. |
 | Coastal Piracy | Whenever a creature you control deals combat damage to an opponent, you may draw a card. |
 | Coat of Arms | Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it. |
-| Cockatrice | Whenever this blocks or becomes blocked by a non-Wall creature, destroy that creature at end of combat. |
 | Cone of Flame | this deals 1 damage to any target, 2 damage to another target, and 3 damage to a third target. |
-| Confiscate | You control enchanted permanent. |
 | Consecrate Land | Enchanted land has indestructible and can't be enchanted by other Auras. |
-| Conspiracy | As this enters, choose a creature type.<br>Creatures you control are the chosen type. The same is true for creature spells you control and creature cards you own that aren't on the battlefield. |
-| Cover of Darkness | As this enters, choose a creature type.<br>Creatures of the chosen type have fear. |
+| Conspiracy | Creatures you control are the chosen type. The same is true for creature spells you control and creature cards you own that aren't on the battlefield. |
 | Cowardice | Whenever a creature becomes the target of a spell or ability, return that creature to its owner's hand. |
 | Cruel Revival | Destroy target non-Zombie creature. It can't be regenerated. Return up to one target Zombie card from your graveyard to your hand. |
 | Curiosity | Whenever enchanted creature deals damage to an opponent, you may draw a card. |
 | Cursed Totem | Activated abilities of creatures can't be activated. |
 | Dandân | When you control no Islands, sacrifice this. |
 | Death Pits of Rath | Whenever a creature is dealt damage, destroy it. It can't be regenerated. |
-| Deathgazer | Whenever this blocks or becomes blocked by a nonblack creature, destroy that creature at end of combat. |
 | Deep Analysis | Flashback—{1}{U}, Pay 3 life. |
 | Defense Grid | Each spell costs {3} more to cast except during its controller's turn. |
 | Defiant Vanguard | When this blocks, at end of combat, destroy it and all creatures it blocked this turn.<br>{5}, {T}: Search your library for a Rebel permanent card with mana value 4 or less, put it onto the battlefield, then shuffle. |
 | Deflection | Change the target of target spell with a single target. |
-| Denizen of the Deep | When this enters, return each other creature you control to its owner's hand. |
-| Desert | {T}: this deals 1 damage to target attacking creature. Activate only during the end of combat step. |
 | Desolation Giant | When this enters, destroy all other creatures you control. If it was kicked, destroy all other creatures instead. |
 | Detonate | Destroy target artifact with mana value X. It can't be regenerated. this deals X damage to that artifact's controller. |
 | Dingus Egg | Whenever a land is put into a graveyard from the battlefield, this deals 2 damage to that land's controller. |
 | Disintegrate | this deals X damage to any target. If it's a creature, it can't be regenerated this turn, and if it would die this turn, exile it instead. |
-| Disrupting Scepter | {3}, {T}: Target player discards a card. Activate only during your turn. |
 | Dissipate | Counter target spell. If that spell is countered this way, exile it instead of putting it into its owner's graveyard. |
 | Distorting Lens | {T}: Target permanent becomes the color of your choice until end of turn. |
 | Dodecapod | If a spell or ability an opponent controls causes you to discard this, put it onto the battlefield with two +1/+1 counters on it instead of putting it into your graveyard. |
 | Dragon Mage | Whenever this deals combat damage to a player, each player discards their hand, then draws seven cards. |
 | Dragon Whelp | {R}: this gets +1/+0 until end of turn. If this ability has been activated four or more times this turn, sacrifice this at the beginning of the next end step. |
-| Dream Prowler | this can't be blocked as long as it's attacking alone. |
 | Duct Crawler | {1}{R}: Target creature can't block this this turn. |
 | Early Harvest | Target player untaps all basic lands they control. |
 | Elven Riders | this can't be blocked except by Walls and/or creatures with flying. |
@@ -90,19 +75,15 @@
 | Elvish Berserker | Whenever this becomes blocked, it gets +1/+1 until end of turn for each creature blocking it. |
 | Elvish Pioneer | When this enters, you may put a basic land card from your hand onto the battlefield tapped. |
 | Elvish Piper | {G}, {T}: You may put a creature card from your hand onto the battlefield. |
-| Ember Beast | this can't attack or block alone. |
-| Emerald Medallion | Green spells you cast cost {1} less to cast. |
 | Emperor Crocodile | When you control no other creatures, sacrifice this. |
 | Enduring Renewal | Play with your hand revealed.<br>If you would draw a card, reveal the top card of your library instead. If it's a creature card, put it into your graveyard. Otherwise, draw a card.<br>Whenever a creature is put into your graveyard from the battlefield, return it to your hand. |
 | Ensnaring Bridge | Creatures with power greater than the number of cards in your hand can't attack. |
-| Eradicate | Exile target nonblack creature. Search its controller's graveyard, hand, and library for all cards with the same name as that creature and exile them. Then that player shuffles. |
 | Essence Sliver | Whenever a Sliver deals damage, its controller gains that much life. |
 | Evil Eye of Orms-by-Gore | Non-Eye creatures you control can't attack. |
 | Evil Presence | Enchanted land is a Swamp. |
 | Exhaustion | Creatures and lands target opponent controls don't untap during their next untap step. |
 | Faceless Butcher | When this enters, exile another target creature.<br>When this leaves the battlefield, return the exiled card to the battlefield under its owner's control. |
 | Fact or Fiction | Reveal the top five cards of your library. An opponent separates those cards into two piles. Put one pile into your hand and the other into your graveyard. |
-| Faerie Conclave | {1}{U}: this becomes a 2/1 blue Faerie creature with flying until end of turn. It's still a land. |
 | Fecundity | Whenever a creature dies, that creature's controller may draw a card. |
 | Feldon's Cane | {T}, Exile this: Shuffle your graveyard into your library. |
 | Fellwar Stone | {T}: Add one mana of any color that a land an opponent controls could produce. |
@@ -111,13 +92,11 @@
 | Fiery Justice | this deals 5 damage divided as you choose among any number of targets. Target opponent gains 5 life. |
 | Final Punishment | Target player loses life equal to the damage already dealt to that player this turn. |
 | Fire // Ice | Fire deals 2 damage divided as you choose among one or two targets. |
-| Fire Whip | Enchanted creature has "{T}: this deals 1 damage to any target." |
 | Fireball | this costs {1} more to cast for each target beyond the first.<br>this deals X damage divided evenly, rounded down, among any number of targets. |
 | Flame Wave | this deals 4 damage to target player or planeswalker and each creature that player or that planeswalker's controller controls. |
 | Fledgling Dragon | Threshold — As long as there are seven or more cards in your graveyard, this gets +3/+3 and has "{R}: this gets +1/+0 until end of turn." |
 | Fog Elemental | When this attacks or blocks, sacrifice it at end of combat. |
-| Forbidding Watchtower | {1}{W}: this becomes a 1/5 white Soldier creature until end of turn. It's still a land. |
-| Form of the Dragon | At the beginning of each end step, your life total becomes 5.<br>Creatures without flying can't attack you. |
+| Form of the Dragon | At the beginning of each end step, your life total becomes 5. |
 | Frozen Solid | When enchanted creature is dealt damage, destroy it. |
 | Furnace of Rath | If a source would deal damage to a permanent or player, it deals double that damage to that permanent or player instead. |
 | Future Sight | Play with the top card of your library revealed.<br>You may play lands and cast spells from the top of your library. |
@@ -126,15 +105,13 @@
 | Gaea's Liege | As long as this isn't attacking, its power and toughness are each equal to the number of Forests you control. As long as this is attacking, its power and toughness are each equal to the number of Forests defending player controls.<br>{T}: Target land becomes a Forest until this leaves the battlefield. |
 | Gaea's Might | Domain — Target creature gets +1/+1 until end of turn for each basic land type among lands you control. |
 | Genesis | At the beginning of your upkeep, if this is in your graveyard, you may pay {2}{G}. If you do, return target creature card from your graveyard to your hand. |
-| Ghitu Encampment | {1}{R}: this becomes a 2/1 red Warrior creature with first strike until end of turn. It's still a land. |
 | Giant Oyster | You may choose not to untap this during your untap step.<br>{T}: For as long as this remains tapped, target tapped creature doesn't untap during its controller's untap step, and at the beginning of each of your draw steps, put a -1/-1 counter on that creature. When this leaves the battlefield or becomes untapped, remove all -1/-1 counters from the creature. |
 | Gift of Estates | If an opponent controls more lands than you, search your library for up to three Plains cards, reveal them, put them into your hand, then shuffle. |
-| Gilded Light | You gain shroud until end of turn. |
 | Goblin Grenade | As an additional cost to cast this, sacrifice a Goblin. |
 | Goblin Piledriver | Whenever this attacks, it gets +2/+0 until end of turn for each other attacking Goblin. |
 | Goblin Ringleader | When this enters, reveal the top four cards of your library. Put all Goblin cards revealed this way into your hand and the rest on the bottom of your library in any order. |
 | Goblin Snowman | Whenever this blocks, prevent all combat damage that would be dealt to and dealt by it this turn.<br>{T}: this deals 1 damage to target creature it's blocking. |
-| Goblin Warchief | Goblin spells you cast cost {1} less to cast.<br>Goblins you control have haste. |
+| Goblin Warchief | Goblins you control have haste. |
 | Gorilla Shaman | {X}{X}{1}: Destroy target noncreature artifact with mana value X. |
 | Gratuitous Violence | If a creature you control would deal damage to a permanent or player, it deals double that damage instead. |
 | Grim Lavamancer | {R}, {T}, Exile two cards from your graveyard: this deals 2 damage to any target. |
@@ -144,22 +121,15 @@
 | Hail Storm | this deals 2 damage to each attacking creature and 1 damage to you and each creature you control. |
 | Haunting Echoes | Exile all cards from target player's graveyard other than basic land cards. For each card exiled this way, search that player's library for all cards with the same name as that card and exile them. Then that player shuffles. |
 | Head Games | Target opponent puts the cards from their hand on top of their library. Search that player's library for that many cards. The player puts those cards into their hand, then shuffles. |
-| Hidden Horror | When this enters, sacrifice it unless you discard a creature card. |
 | High Ground | Each creature you control can block an additional creature each combat. |
 | Honorable Passage | The next time a source of your choice would deal damage to any target this turn, prevent that damage. If damage from a red source is prevented this way, this deals that much damage to the source's controller. |
 | Horror of Horrors | Sacrifice a Swamp: Regenerate target black creature. |
-| Howling Mine | At the beginning of each player's draw step, if this is untapped, that player draws an additional card. |
 | Hunted Wumpus | When this enters, each other player may put a creature card from their hand onto the battlefield. |
-| Hurkyl's Recall | Return all artifacts target player owns to their hand. |
 | Imaginary Pet | At the beginning of your upkeep, if you have a card in hand, return this to its owner's hand. |
 | Imperial Recruiter | When this enters, search your library for a creature card with power 2 or less, reveal it, put it into your hand, then shuffle. |
 | Inflame | this deals 2 damage to each creature dealt damage this turn. |
 | Intruder Alarm | Creatures don't untap during their controllers' untap steps.<br>Whenever a creature enters, untap all creatures. |
-| Ivory Mask | You have shroud. |
-| Jade Statue | {2}: this becomes a 3/6 Golem artifact creature until end of combat. Activate only during combat. |
 | Jester's Cap | {2}, {T}, Sacrifice this: Search target player's library for three cards and exile them. Then that player shuffles. |
-| Jet Medallion | Black spells you cast cost {1} less to cast. |
-| Jinxed Idol | Sacrifice a creature: Target opponent gains control of this. |
 | Jolrael, Empress of Beasts | {2}{G}, {T}, Discard two cards: All lands target player controls become 3/3 creatures until end of turn. They're still lands. |
 | Junk Diver | When this dies, return another target artifact card from your graveyard to your hand. |
 | Karplusan Yeti | {T}: this deals damage equal to its power to target creature. That creature deals damage equal to its power to this. |
@@ -171,11 +141,9 @@
 | Leviathan | this enters tapped and doesn't untap during your untap step.<br>At the beginning of your upkeep, you may sacrifice two Islands. If you do, untap this.<br>this can't attack unless you sacrifice two Islands. |
 | Living Terrain | Enchanted land is a 5/6 green Treefolk creature that's still a land. |
 | Llanowar Sentinel | When this enters, you may pay {1}{G}. If you do, search your library for a card named this, put that card onto the battlefield, then shuffle. |
-| Lone Wolf | You may have this assign its combat damage as though it weren't blocked. |
 | Lord of the Pit | At the beginning of your upkeep, sacrifice a creature other than this. If you can't, this deals 7 damage to you. |
 | Loyal Sentry | When this blocks a creature, destroy that creature and this. |
 | Lure | All creatures able to block enchanted creature do so. |
-| Magistrate's Scepter | {T}, Remove three charge counters from this: Take an extra turn after this one. |
 | Mana Clash | You and target opponent each flip a coin. this deals 1 damage to each player whose coin comes up tails. Repeat this process until both players' coins come up heads on the same flip. |
 | Manabarbs | Whenever a player taps a land for mana, this deals 1 damage to that player. |
 | Marble Titan | Creatures with power 3 or greater don't untap during their controllers' untap steps. |
@@ -187,10 +155,9 @@
 | Mind Bend | Change the text of target permanent by replacing all instances of one color word with another or one basic land type with another. |
 | Mirari | Whenever you cast an instant or sorcery spell, you may pay {3}. If you do, copy that spell. You may choose new targets for the copy. |
 | Mirari's Wake | Whenever you tap a land for mana, add one mana of any type that land produced. |
-| Mishra's Factory | {1}: this becomes a 2/2 Assembly-Worker artifact creature until end of turn. It's still a land.<br>{T}: Target Assembly-Worker creature gets +1/+1 until end of turn. |
+| Mishra's Factory | {T}: Target Assembly-Worker creature gets +1/+1 until end of turn. |
 | Mistform Ultimus | this is every creature type . |
 | Mobilization | Soldier creatures have vigilance. |
-| Mogg Flunkies | this can't attack or block alone. |
 | Mogg Salvage | If an opponent controls an Island and you control a Mountain, you may cast this without paying its mana cost. |
 | Mortal Combat | At the beginning of your upkeep, if twenty or more creature cards are in your graveyard, you win the game. |
 | Mulch | Reveal the top four cards of your library. Put all land cards revealed this way into your hand and the rest into your graveyard. |
@@ -216,116 +183,85 @@
 | Pariah | All damage that would be dealt to you is dealt to enchanted creature instead. |
 | Patriarch's Bidding | Each player chooses a creature type. Each player returns all creature cards of a type chosen this way from their graveyard to the battlefield. |
 | Pay No Heed | Prevent all damage a source of your choice would deal this turn. |
-| Pearl Medallion | White spells you cast cost {1} less to cast. |
 | Peek | Look at target player's hand. |
 | Pendelhaven | {T}: Target 1/1 creature gets +1/+2 until end of turn. |
 | Persecute | Choose a color. Target player reveals their hand and discards all cards of that color. |
-| Persuasion | You control enchanted creature. |
 | Phage the Untouchable | When this enters, if you didn't cast it from your hand, you lose the game.<br>Whenever this deals combat damage to a creature, destroy that creature. It can't be regenerated.<br>Whenever this deals combat damage to a player, that player loses the game. |
 | Pirate Ship | When you control no Islands, sacrifice this. |
 | Plagiarize | Until end of turn, if target player would draw a card, instead that player skips that draw and you draw a card. |
 | Plow Under | Put two target lands on top of their owners' libraries. |
 | Polymorph | Destroy target creature. It can't be regenerated. Its controller reveals cards from the top of their library until they reveal a creature card. The player puts that card onto the battlefield, then shuffles all other cards revealed this way into their library. |
 | Primal Clay | As this enters, it becomes your choice of a 3/3 artifact creature, a 2/2 artifact creature with flying, or a 1/6 Wall artifact creature with defender in addition to its other types. |
-| Primeval Force | When this enters, sacrifice it unless you sacrifice three Forests. |
 | Prohibit | Counter target spell if its mana value is 2 or less. If this was kicked, counter that spell if its mana value is 4 or less instead. |
 | Propaganda | Creatures can't attack you unless their controller pays {2} for each creature they control that's attacking you. |
-| Pyrotechnics | this deals 4 damage divided as you choose among any number of targets. |
-| Quash | Counter target instant or sorcery spell. Search its controller's graveyard, hand, and library for all cards with the same name as that spell and exile them. Then that player shuffles. |
 | Quicksilver Amulet | {4}, {T}: You may put a creature card from your hand onto the battlefield. |
 | Quirion Dryad | Whenever you cast a spell that's white, blue, black, or red, put a +1/+1 counter on this. |
 | Quirion Ranger | Return a Forest you control to its owner's hand: Untap target creature. Activate only once each turn. |
-| Rathi Dragon | When this enters, sacrifice it unless you sacrifice two Mountains. |
 | Reconnaissance | {0}: Remove target attacking creature you control from combat and untap it. |
 | Redeem | Prevent all damage that would be dealt this turn to up to two target creatures. |
 | Reflecting Pool | {T}: Add one mana of any type that a land you control could produce. |
 | Relentless Assault | Untap all creatures that attacked this turn. After this main phase, there is an additional combat phase followed by an additional main phase. |
-| Reminisce | Target player shuffles their graveyard into their library. |
 | Restock | Return two target cards from your graveyard to your hand. Exile this. |
 | Reverse Damage | The next time a source of your choice would deal damage to you this turn, prevent that damage. You gain life equal to the damage prevented this way. |
-| Rhox | You may have this assign its combat damage as though it weren't blocked. |
-| Rogue Kavu | Whenever this attacks alone, it gets +2/+0 until end of turn. |
 | Rolling Stones | Wall creatures can attack as though they didn't have defender. |
-| Rolling Thunder | this deals X damage divided as you choose among any number of targets. |
 | Root Maze | Artifacts and lands enter tapped. |
 | Rootwater Matriarch | {T}: Gain control of target creature for as long as that creature is enchanted. |
-| Ruby Medallion | Red spells you cast cost {1} less to cast. |
 | Sacred Ground | Whenever a spell or ability an opponent controls causes a land to be put into your graveyard from the battlefield, return that card to the battlefield. |
-| Sacred Mesa | At the beginning of your upkeep, sacrifice this unless you sacrifice a Pegasus. |
 | Safe Haven | At the beginning of your upkeep, you may sacrifice this. If you do, return each card exiled with this to the battlefield under its owner's control. |
 | Sanctimony | Whenever an opponent taps a Mountain for mana, you may gain 1 life. |
 | Sanctum Guardian | Sacrifice this: The next time a source of your choice would deal damage to any target this turn, prevent that damage. |
-| Sapphire Medallion | Blue spells you cast cost {1} less to cast. |
 | Scalpelexis | Whenever this deals combat damage to a player, that player exiles the top four cards of their library. If two or more of those cards have the same name, repeat this process. |
 | Scoria Wurm | At the beginning of your upkeep, flip a coin. If you lose the flip, return this to its owner's hand. |
-| Scour | Exile target enchantment. Search its controller's graveyard, hand, and library for all cards with the same name as that enchantment and exile them. Then that player shuffles. |
 | Sea Drake | When this enters, return two target lands you control to their owner's hand. |
 | Sea's Claim | Enchanted land is an Island. |
 | Seedborn Muse | Untap all permanents you control during each other player's untap step. |
 | Sengir Autocrat | When this leaves the battlefield, exile all Serf tokens. |
 | Serra Avatar | When this is put into a graveyard from anywhere, shuffle it into its owner's library. |
-| Shifting Sky | As this enters, choose a color.<br>All nonland permanents are the chosen color. |
+| Shifting Sky | All nonland permanents are the chosen color. |
 | Sindbad | {T}: Draw a card and reveal it. If it isn't a land card, discard it. |
 | Skizzik | At the beginning of the end step, if this wasn't kicked, sacrifice it. |
 | Skyshroud Ranger | {T}: You may put a land card from your hand onto the battlefield. Activate only as a sorcery. |
 | Slate of Ancestry | {4}, {T}, Discard your hand: Draw a card for each creature you control. |
 | Sleeper Agent | When this enters, target opponent gains control of it. |
 | Sneaky Homunculus | this can't block or be blocked by creatures with power 2 or greater. |
-| Solitary Confinement | At the beginning of your upkeep, sacrifice this unless you discard a card.<br>Skip your draw step.<br>You have shroud.<br>Prevent all damage that would be dealt to you. |
+| Solitary Confinement | Skip your draw step.<br>Prevent all damage that would be dealt to you. |
 | Soul Collector | Whenever a creature dealt damage by this this turn dies, return that card to the battlefield under your control. |
-| Sowing Salt | Exile target nonbasic land. Search its controller's graveyard, hand, and library for all cards with the same name as that land and exile them. Then that player shuffles. |
 | Spawning Pool | {1}{B}: this becomes a 1/1 black Skeleton creature with "{B}: Regenerate this" until end of turn. It's still a land. |
 | Spell Blast | Counter target spell with mana value X. |
-| Spellbook | You have no maximum hand size. |
 | Spined Sliver | Whenever a Sliver becomes blocked, that Sliver gets +1/+1 until end of turn for each creature blocking it. |
 | Spirit Link | Whenever enchanted creature deals damage, you gain that much life. |
 | Spitting Slug | Whenever this blocks or becomes blocked, you may pay {1}{G}. If you do, this gains first strike until end of turn. Otherwise, each creature blocking or blocked by this gains first strike until end of turn. |
-| Splinter | Exile target artifact. Search its controller's graveyard, hand, and library for all cards with the same name as that artifact and exile them. Then that player shuffles. |
 | Spreading Algae | Enchant Swamp<br>When enchanted land becomes tapped, destroy it. |
-| Squirrel Nest | Enchanted land has "{T}: Create a 1/1 green Squirrel creature token." |
 | Stalking Stones | {6}: this becomes a 3/3 Elemental artifact creature that's still a land. |
 | Stampeding Wildebeests | At the beginning of your upkeep, return a green creature you control to its owner's hand. |
 | Star Compass | {T}: Add one mana of any color that a basic land you control could produce. |
-| Steal Artifact | You control enchanted artifact. |
 | Steel Golem | You can't cast creature spells. |
 | Sterling Grove | Other enchantments you control have shroud.<br>{1}, Sacrifice this: Search your library for an enchantment card, reveal it, then shuffle and put that card on top. |
 | Stone Giant | {T}: Target creature you control with toughness less than this's power gains flying until end of turn. Destroy that creature at the beginning of the next end step. |
 | Storage Matrix | As long as this is untapped, each player chooses artifact, creature, or land during their untap step. That player can untap only permanents of the chosen type this step. |
-| Stormscape Familiar | White spells and black spells you cast cost {1} less to cast. |
-| Story Circle | As this enters, choose a color.<br>{W}: The next time a source of your choice of the chosen color would deal damage to you this turn, prevent that damage. |
+| Story Circle | {W}: The next time a source of your choice of the chosen color would deal damage to you this turn, prevent that damage. |
 | Stupor | Target opponent discards a card at random, then discards a card. |
 | Sunken Hope | At the beginning of each player's upkeep, that player returns a creature they control to its owner's hand. |
 | Sutured Ghoul | As this enters, exile any number of creature cards from your graveyard.<br>this's power is equal to the total power of the exiled cards and its toughness is equal to their total toughness. |
 | Swamp Mosquito | Whenever this attacks and isn't blocked, defending player gets a poison counter. |
-| Sylvan Basilisk | Whenever this becomes blocked by a creature, destroy that creature. |
 | Sylvan Messenger | When this enters, reveal the top four cards of your library. Put all Elf cards revealed this way into your hand and the rest on the bottom of your library in any order. |
 | Syncopate | Counter target spell unless its controller pays {X}. If that spell is countered this way, exile it instead of putting it into its owner's graveyard. |
-| Teferi's Moat | As this enters, choose a color.<br>Creatures of the chosen color without flying can't attack you. |
 | Teferi's Puzzle Box | At the beginning of each player's draw step, that player puts the cards in their hand on the bottom of their library in any order, then draws that many cards. |
 | Telepathy | Your opponents play with their hands revealed. |
 | The Rack | As this enters, choose an opponent.<br>At the beginning of the chosen player's upkeep, this deals X damage to that player, where X is 3 minus the number of cards in their hand. |
 | Thieves' Auction | Exile all nontoken permanents. Starting with you, each player chooses one of the exiled cards and puts it onto the battlefield tapped under their control. Repeat this process until all cards exiled this way have been chosen. |
-| Thorn Elemental | You may have this assign its combat damage as though it weren't blocked. |
 | Thornscape Battlemage | When this enters, if it was kicked with its {R} kicker, it deals 2 damage to any target.<br>When this enters, if it was kicked with its {W} kicker, destroy target artifact. |
 | Thran Golem | As long as this is enchanted, it gets +2/+2 and has flying, first strike, and trample. |
-| Threaten | Untap target creature and gain control of it until end of turn. That creature gains haste until end of turn. |
 | Thrive | Put a +1/+1 counter on each of X target creatures. |
 | Thrull Surgeon | {1}{B}, Sacrifice this: Look at target player's hand and choose a card from it. That player discards that card. Activate only as a sorcery. |
-| Time Stretch | Target player takes two extra turns after this one. |
-| Time Warp | Target player takes an extra turn after this one. |
 | Tormod's Crypt | {T}, Sacrifice this: Exile target player's graveyard. |
 | Torture | {1}{B}: Put a -1/-1 counter on enchanted creature. |
-| Traumatize | Target player mills half their library, rounded down. |
 | Treetop Bracers | Enchanted creature gets +1/+1 and can't be blocked except by creatures with flying. |
-| Treetop Village | {1}{G}: this becomes a 3/3 green Ape creature with trample until end of turn. It's still a land. |
-| True Believer | You have shroud. |
 | Two-Headed Dragon | this can block an additional creature each combat. |
 | Uncle Istvan | Prevent all damage that would be dealt to this by creatures. |
-| Undead Warchief | Zombie spells you cast cost {1} less to cast. |
 | Unstable Mutation | At the beginning of the upkeep of enchanted creature's controller, put a -1/-1 counter on that creature. |
 | Upwelling | Players don't lose unspent mana as steps and phases end. |
 | Urza's Armor | If a source would deal damage to you, prevent 1 of that damage. |
-| Urza's Incubator | As this enters, choose a creature type.<br>Creature spells of the chosen type cost {2} less to cast. |
 | Urza's Mine | {T}: Add {C}. If you control an Urza's Power-Plant and an Urza's Tower, add {C}{C} instead. |
 | Urza's Power Plant | {T}: Add {C}. If you control an Urza's Mine and an Urza's Tower, add {C}{C} instead. |
 | Urza's Rage | this deals 3 damage to any target. If this was kicked, instead it deals 10 damage to that permanent or player and the damage can't be prevented. |
@@ -336,7 +272,6 @@
 | Vexing Arcanix | {3}, {T}: Target player chooses a card name, then reveals the top card of their library. If that card has the chosen name, that player puts it into their hand. Otherwise, they put it into their graveyard and this deals 2 damage to them. |
 | Vhati il-Dal | {T}: Until end of turn, target creature has base power 1 or base toughness 1. |
 | Victimize | Choose two target creature cards in your graveyard. Sacrifice a creature. If you do, return the chosen cards to the battlefield tapped. |
-| Voice of All | As this enters, choose a color. |
 | Void | Choose a number. Destroy all artifacts and creatures with mana value equal to that number. Then target player reveals their hand and discards all nonland cards with mana value equal to the number. |
 | Wall of Essence | Whenever this is dealt combat damage, you gain that much life. |
 | Wall of Roots | Put a -0/-1 counter on this: Add {G}. Activate only once each turn. |

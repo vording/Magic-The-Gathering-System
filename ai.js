@@ -63,6 +63,23 @@ const AI = (() => {
     const best = (list, f = (t) => value(G, t.obj)) => [...list].sort((a, b) => f(b) - f(a))[0] ?? null;
     const n = fx.n === 'X' ? x : fx.n;
     const crt = (t) => isT(G, t.obj, 'creature');
+    // 割り振るダメージ：倒せるクリーチャーから順に、残りは相手へ
+    if (spec.divided) {
+      let rest = n;
+      const parts = [];
+      const kill = theirs.filter((t) => crt(t) && E().ch(G, t.obj).hasPT && !E().ch(G, t.obj).kw.has('indestructible'))
+        .map((t) => ({ t, need: E().ch(G, t.obj).t - o(G, t.obj).damage }))
+        .filter((k) => k.need >= 1).sort((a, b) => value(G, b.t.obj) - value(G, a.t.obj));
+      for (const k of kill) {
+        if (parts.length >= spec.divided.max - (face ? 1 : 0) || k.need > rest) continue;
+        parts.push({ obj: k.t.obj, n: k.need });
+        rest -= k.need;
+      }
+      if (rest > 0 && face && parts.length < spec.divided.max) parts.push({ player: q, n: rest });
+      else if (rest > 0 && parts.length) parts[0].n += rest;
+      if (!parts.length) return null;
+      return { divide: parts };
+    }
     switch (fx.type) {
       case 'damage': {
         if (face && G.players[q].life <= n) return face;
@@ -115,6 +132,10 @@ const AI = (() => {
       case 'exileGrave': return [...cands].filter((t) => t.grave != null && o(G, t.grave).owner === q).sort((a, b) => (o(G, b.grave).def.cmc || 0) - (o(G, a.grave).def.cmc || 0))[0] ?? null;
       case 'preventBy': return best(theirs.filter((t) => crt(t) && o(G, t.obj).attacking)) ?? null;
       case 'topdeck': return best(theirs.filter((t) => !isT(G, t.obj, 'land'))) ?? null;
+      case 'threaten': return best(theirs.filter((t) => crt(t) && E().ch(G, t.obj).p > 0)) ?? null;
+      case 'giveControl': return face ?? null;
+      case 'extraTurn': return cands.find((t) => t.player === p) ?? null;
+      case 'drawPlayer': return cands.find((t) => t.player === p) ?? null;
       case 'tapOrUntap': return best(theirs.filter((t) => !o(G, t.obj).tapped)) ?? (mode === 'etb' ? cands[0] : null);
       case 'counter': {
         const s = cands.map((t) => G.stack.find((x) => x.sid === t.stack)).filter((s) => s && s.controller === q).at(-1);
@@ -263,7 +284,7 @@ const AI = (() => {
     for (const id of [...bfOf(G, p), ...G.players[p].hand]) {
       for (const a of E().activations(G, p, id)) {
         if (!a.ok || a.mana) continue;
-        const ab = o(G, id).def.activated[a.index];
+        const ab = E().abilitiesOf(G, id)[a.index];
         const fx = ab.effects;
         const kinds = fx.map((f) => f.type);
         // 自分のメインで使うもの
@@ -322,6 +343,8 @@ const AI = (() => {
     // 返しのターンに負けそうなら、警戒のないものは守りに残す
     const crack = creatures(G, q).reduce((s, id) => s + Math.max(0, E().ch(G, id).p), 0);
     if (crack >= G.players[p].life) attackers = attackers.filter((id) => E().ch(G, id).kw.has('vigilance'));
+    // 単独では攻撃できないもの
+    if (attackers.length === 1 && (E().ch(G, attackers[0]).notAlone || E().ch(G, attackers[0]).notAloneAttack)) attackers = [];
     // 「可能なら攻撃する」
     for (const id of mine) if (E().ch(G, id).mustAttack && !attackers.includes(id)) attackers.push(id);
     return attackers;
@@ -350,6 +373,9 @@ const AI = (() => {
       }
       if (best != null) { blocks[best] = a; used.add(best); } else unblocked.push(a);
     }
+    // 単独ではブロックできないもの
+    const solo = Object.keys(blocks).map(Number);
+    if (solo.length === 1 && (E().ch(G, solo[0]).notAlone || E().ch(G, solo[0]).notAloneBlock)) { delete blocks[solo[0]]; used.delete(solo[0]); }
     let incoming = unblocked.reduce((s, a) => s + Math.max(0, E().ch(G, a).p), 0);
     for (const a of unblocked) {
       if (incoming < G.players[p].life) break;
@@ -389,7 +415,7 @@ const AI = (() => {
       const id = u.card.iid;
       if (u.alive || o(G, id).controller !== p || o(G, id).regen) continue;
       for (const a of E().activations(G, p, id)) {
-        if (a.ok && o(G, id).def.activated[a.index].effects.some((f) => f.type === 'regen' && f.self)) return { type: 'activate', id, index: a.index, targets: [] };
+        if (a.ok && E().abilitiesOf(G, id)[a.index].effects.some((f) => f.type === 'regen' && f.self)) return { type: 'activate', id, index: a.index, targets: [] };
       }
     }
     // 修整：自分のクリーチャーが生き残る・相手を倒せる
@@ -401,7 +427,7 @@ const AI = (() => {
       // 火吹き：ブロックされていない攻撃クリーチャーにマナを注ぐ
       if (!fightNow && u.side === 'me' && !defending) {
         for (const a of E().activations(G, p, id)) {
-          const ab = o(G, id).def.activated[a.index];
+          const ab = E().abilitiesOf(G, id)[a.index];
           if (a.ok && !a.mana && ab.effects.every((f) => f.type === 'selfPump' && f.p > 0)) return { type: 'activate', id, index: a.index, targets: [] };
         }
         continue;
@@ -418,7 +444,7 @@ const AI = (() => {
         return { type: 'cast', id: h, targets: [{ obj: id }] };
       }
       for (const a of E().activations(G, p, id)) {
-        const ab = o(G, id).def.activated[a.index];
+        const ab = E().abilitiesOf(G, id)[a.index];
         if (a.ok && !a.mana && ab.effects.every((f) => f.type === 'selfPump')) return { type: 'activate', id, index: a.index, targets: [] };
       }
     }
@@ -455,7 +481,7 @@ const AI = (() => {
     for (const id of threatened) {
       if (o(G, id).regen) continue;
       for (const a of E().activations(G, p, id)) {
-        if (a.ok && o(G, id).def.activated[a.index].effects.some((f) => f.type === 'regen' && f.self)) return { type: 'activate', id, index: a.index, targets: [] };
+        if (a.ok && E().abilitiesOf(G, id)[a.index].effects.some((f) => f.type === 'regen' && f.self)) return { type: 'activate', id, index: a.index, targets: [] };
       }
     }
     void q;
@@ -519,6 +545,21 @@ const AI = (() => {
       }
       case 'discard': return { type: 'choose', ids: chooseDiscard(G, p, pend.n, pend.options) };
       case 'search': return { type: 'choose', ids: [chooseSearch(G, p, pend.options)] };
+      case 'sacUnlessOther': {
+        const keep = value(G, pend.id) >= 4;
+        const opts = [...pend.options].sort((a, b) => value(G, a) - value(G, b)).slice(0, pend.n);
+        return keep ? { type: 'choose', ids: opts } : { type: 'choose', ids: [] };
+      }
+      case 'chooseWord': {
+        // 色：相手のパーマネントに多い色。タイプ：自分のクリーチャーに多いタイプ
+        if (pend.what === 'color') {
+          const count = (c) => bfOf(G, other(p)).filter((id) => o(G, id).def.colors.includes({ white: 'W', blue: 'U', black: 'B', red: 'R', green: 'G' }[c])).length;
+          return { type: 'word', value: [...pend.options].sort((a, b) => count(b) - count(a))[0] };
+        }
+        const mine = [...G.players[p].library, ...G.players[p].hand, ...bfOf(G, p)].flatMap((id) => o(G, id).def.types.includes('creature') ? o(G, id).def.subtypes.map((t) => t.toLowerCase()) : []);
+        const freq = (t) => mine.filter((x) => x === t).length;
+        return { type: 'word', value: [...pend.options].sort((a, b) => freq(b) - freq(a))[0] };
+      }
       case 'returnOwn': return { type: 'choose', ids: [[...pend.options].sort((a, b) => value(G, a) - value(G, b))[0]] };
       case 'sacrifice': return { type: 'choose', ids: [...pend.options].sort((a, b) => value(G, a) - value(G, b)).slice(0, pend.n) };
       case 'scry': {
