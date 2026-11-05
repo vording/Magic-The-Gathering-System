@@ -680,6 +680,8 @@ function renderBanner(n) {
         button(`ブロックを確定（${Object.keys(ui.blocks).length}体）`, () => act(ME, { type: 'blockers', blocks: ui.blocks }), true));
     case 'payOrNot':
       return show(span(`${p.reason}`), button(`${p.cost}を支払う`, () => act(ME, { type: 'pay', yes: true }), true, !p.canPay), button('支払わない', () => act(ME, { type: 'pay', yes: false })));
+    case 'putFromHand':
+      return show(span(`${p.reason}：戦場に出すカードを手札から選んでください`), ...p.options.map((h) => button(G.objects[h].card.name, () => act(ME, { type: 'choose', ids: [h] }))), button('出さない', () => act(ME, { type: 'choose', ids: [] })));
     case 'sacUnlessOther': {
       const what = p.how === 'discard' ? '捨てる' : p.how === 'return' ? '手札に戻す' : '生け贄に捧げる';
       openViewer({ title: `${p.reason}：${what}ものを${p.n}つ`, ids: p.options, hint: 'クリックで選ぶ（もう一度で取り消し）', multi: true });

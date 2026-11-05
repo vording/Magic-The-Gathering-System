@@ -1,6 +1,6 @@
 # 旧枠モダンの自動処理の対応状況
 
-全1016種類：すべて自動 730（71.9%）・一部だけ 93・できない 193（2026-11-05 時点。`node tools/coverage.js --write` で更新）
+全1016種類：すべて自動 754（74.2%）・一部だけ 81・できない 181（2026-11-05 時点。`node tools/coverage.js --write` で更新）
 
 ## 読み取れない文があるカード
 
@@ -40,22 +40,17 @@
 | Chance Encounter | Whenever you win a coin flip, put a luck counter on this.<br>At the beginning of your upkeep, if this has ten or more luck counters on it, you win the game. |
 | Choke | Islands don't untap during their controllers' untap steps. |
 | Cinder Wall | When this blocks, destroy it at end of combat. |
-| Citanul Flute | {X}, {T}: Search your library for a creature card with mana value X or less, reveal it, put it into your hand, then shuffle. |
 | City of Brass | Whenever this becomes tapped, it deals 1 damage to you. |
 | Clone | You may have this enter as a copy of any creature on the battlefield. |
 | Coalition Victory | You win the game if you control a land of each basic land type and a creature of each color. |
-| Coastal Piracy | Whenever a creature you control deals combat damage to an opponent, you may draw a card. |
 | Coat of Arms | Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it. |
 | Cone of Flame | this deals 1 damage to any target, 2 damage to another target, and 3 damage to a third target. |
 | Consecrate Land | Enchanted land has indestructible and can't be enchanted by other Auras. |
 | Conspiracy | Creatures you control are the chosen type. The same is true for creature spells you control and creature cards you own that aren't on the battlefield. |
 | Cowardice | Whenever a creature becomes the target of a spell or ability, return that creature to its owner's hand. |
 | Cruel Revival | Destroy target non-Zombie creature. It can't be regenerated. Return up to one target Zombie card from your graveyard to your hand. |
-| Curiosity | Whenever enchanted creature deals damage to an opponent, you may draw a card. |
 | Cursed Totem | Activated abilities of creatures can't be activated. |
-| Dandân | When you control no Islands, sacrifice this. |
 | Death Pits of Rath | Whenever a creature is dealt damage, destroy it. It can't be regenerated. |
-| Deep Analysis | Flashback—{1}{U}, Pay 3 life. |
 | Defense Grid | Each spell costs {3} more to cast except during its controller's turn. |
 | Defiant Vanguard | When this blocks, at end of combat, destroy it and all creatures it blocked this turn.<br>{5}, {T}: Search your library for a Rebel permanent card with mana value 4 or less, put it onto the battlefield, then shuffle. |
 | Deflection | Change the target of target spell with a single target. |
@@ -73,9 +68,6 @@
 | Elven Riders | this can't be blocked except by Walls and/or creatures with flying. |
 | Elvish Bard | All creatures able to block this do so. |
 | Elvish Berserker | Whenever this becomes blocked, it gets +1/+1 until end of turn for each creature blocking it. |
-| Elvish Pioneer | When this enters, you may put a basic land card from your hand onto the battlefield tapped. |
-| Elvish Piper | {G}, {T}: You may put a creature card from your hand onto the battlefield. |
-| Emperor Crocodile | When you control no other creatures, sacrifice this. |
 | Enduring Renewal | Play with your hand revealed.<br>If you would draw a card, reveal the top card of your library instead. If it's a creature card, put it into your graveyard. Otherwise, draw a card.<br>Whenever a creature is put into your graveyard from the battlefield, return it to your hand. |
 | Ensnaring Bridge | Creatures with power greater than the number of cards in your hand can't attack. |
 | Essence Sliver | Whenever a Sliver deals damage, its controller gains that much life. |
@@ -88,7 +80,6 @@
 | Feldon's Cane | {T}, Exile this: Shuffle your graveyard into your library. |
 | Fellwar Stone | {T}: Add one mana of any color that a land an opponent controls could produce. |
 | Fertile Ground | Whenever enchanted land is tapped for mana, its controller adds an additional one mana of any color. |
-| Fierce Empath | When this enters, you may search your library for a creature card with mana value 6 or greater, reveal it, put it into your hand, then shuffle. |
 | Fiery Justice | this deals 5 damage divided as you choose among any number of targets. Target opponent gains 5 life. |
 | Final Punishment | Target player loses life equal to the damage already dealt to that player this turn. |
 | Fire // Ice | Fire deals 2 damage divided as you choose among one or two targets. |
@@ -103,15 +94,12 @@
 | Gaea's Blessing | Target player shuffles up to three target cards from their graveyard into their library.<br>When this is put into your graveyard from your library, shuffle your graveyard into your library. |
 | Gaea's Herald | Creature spells can't be countered. |
 | Gaea's Liege | As long as this isn't attacking, its power and toughness are each equal to the number of Forests you control. As long as this is attacking, its power and toughness are each equal to the number of Forests defending player controls.<br>{T}: Target land becomes a Forest until this leaves the battlefield. |
-| Gaea's Might | Domain — Target creature gets +1/+1 until end of turn for each basic land type among lands you control. |
 | Genesis | At the beginning of your upkeep, if this is in your graveyard, you may pay {2}{G}. If you do, return target creature card from your graveyard to your hand. |
 | Giant Oyster | You may choose not to untap this during your untap step.<br>{T}: For as long as this remains tapped, target tapped creature doesn't untap during its controller's untap step, and at the beginning of each of your draw steps, put a -1/-1 counter on that creature. When this leaves the battlefield or becomes untapped, remove all -1/-1 counters from the creature. |
 | Gift of Estates | If an opponent controls more lands than you, search your library for up to three Plains cards, reveal them, put them into your hand, then shuffle. |
-| Goblin Grenade | As an additional cost to cast this, sacrifice a Goblin. |
 | Goblin Piledriver | Whenever this attacks, it gets +2/+0 until end of turn for each other attacking Goblin. |
 | Goblin Ringleader | When this enters, reveal the top four cards of your library. Put all Goblin cards revealed this way into your hand and the rest on the bottom of your library in any order. |
 | Goblin Snowman | Whenever this blocks, prevent all combat damage that would be dealt to and dealt by it this turn.<br>{T}: this deals 1 damage to target creature it's blocking. |
-| Goblin Warchief | Goblins you control have haste. |
 | Gorilla Shaman | {X}{X}{1}: Destroy target noncreature artifact with mana value X. |
 | Gratuitous Violence | If a creature you control would deal damage to a permanent or player, it deals double that damage instead. |
 | Grim Lavamancer | {R}, {T}, Exile two cards from your graveyard: this deals 2 damage to any target. |
@@ -123,19 +111,14 @@
 | Head Games | Target opponent puts the cards from their hand on top of their library. Search that player's library for that many cards. The player puts those cards into their hand, then shuffles. |
 | High Ground | Each creature you control can block an additional creature each combat. |
 | Honorable Passage | The next time a source of your choice would deal damage to any target this turn, prevent that damage. If damage from a red source is prevented this way, this deals that much damage to the source's controller. |
-| Horror of Horrors | Sacrifice a Swamp: Regenerate target black creature. |
 | Hunted Wumpus | When this enters, each other player may put a creature card from their hand onto the battlefield. |
 | Imaginary Pet | At the beginning of your upkeep, if you have a card in hand, return this to its owner's hand. |
-| Imperial Recruiter | When this enters, search your library for a creature card with power 2 or less, reveal it, put it into your hand, then shuffle. |
 | Inflame | this deals 2 damage to each creature dealt damage this turn. |
 | Intruder Alarm | Creatures don't untap during their controllers' untap steps.<br>Whenever a creature enters, untap all creatures. |
 | Jester's Cap | {2}, {T}, Sacrifice this: Search target player's library for three cards and exile them. Then that player shuffles. |
 | Jolrael, Empress of Beasts | {2}{G}, {T}, Discard two cards: All lands target player controls become 3/3 creatures until end of turn. They're still lands. |
-| Junk Diver | When this dies, return another target artifact card from your graveyard to your hand. |
 | Karplusan Yeti | {T}: this deals damage equal to its power to target creature. That creature deals damage equal to its power to this. |
 | Kjeldoran Royal Guard | {T}: All combat damage that would be dealt to you by unblocked creatures this turn is dealt to this instead. |
-| Larceny | Whenever a creature you control deals combat damage to a player, that player discards a card. |
-| Lava Dart | Flashback—Sacrifice a Mountain. |
 | Lavaborn Muse | At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand, this deals 3 damage to that player. |
 | Legacy Weapon | If this would be put into a graveyard from anywhere, reveal this and shuffle it into its owner's library instead. |
 | Leviathan | this enters tapped and doesn't untap during your untap step.<br>At the beginning of your upkeep, you may sacrifice two Islands. If you do, untap this.<br>this can't attack unless you sacrifice two Islands. |
@@ -155,9 +138,7 @@
 | Mind Bend | Change the text of target permanent by replacing all instances of one color word with another or one basic land type with another. |
 | Mirari | Whenever you cast an instant or sorcery spell, you may pay {3}. If you do, copy that spell. You may choose new targets for the copy. |
 | Mirari's Wake | Whenever you tap a land for mana, add one mana of any type that land produced. |
-| Mishra's Factory | {T}: Target Assembly-Worker creature gets +1/+1 until end of turn. |
 | Mistform Ultimus | this is every creature type . |
-| Mobilization | Soldier creatures have vigilance. |
 | Mogg Salvage | If an opponent controls an Island and you control a Mountain, you may cast this without paying its mana cost. |
 | Mortal Combat | At the beginning of your upkeep, if twenty or more creature cards are in your graveyard, you win the game. |
 | Mulch | Reveal the top four cards of your library. Put all land cards revealed this way into your hand and the rest into your graveyard. |
@@ -187,14 +168,12 @@
 | Pendelhaven | {T}: Target 1/1 creature gets +1/+2 until end of turn. |
 | Persecute | Choose a color. Target player reveals their hand and discards all cards of that color. |
 | Phage the Untouchable | When this enters, if you didn't cast it from your hand, you lose the game.<br>Whenever this deals combat damage to a creature, destroy that creature. It can't be regenerated.<br>Whenever this deals combat damage to a player, that player loses the game. |
-| Pirate Ship | When you control no Islands, sacrifice this. |
 | Plagiarize | Until end of turn, if target player would draw a card, instead that player skips that draw and you draw a card. |
 | Plow Under | Put two target lands on top of their owners' libraries. |
 | Polymorph | Destroy target creature. It can't be regenerated. Its controller reveals cards from the top of their library until they reveal a creature card. The player puts that card onto the battlefield, then shuffles all other cards revealed this way into their library. |
 | Primal Clay | As this enters, it becomes your choice of a 3/3 artifact creature, a 2/2 artifact creature with flying, or a 1/6 Wall artifact creature with defender in addition to its other types. |
 | Prohibit | Counter target spell if its mana value is 2 or less. If this was kicked, counter that spell if its mana value is 4 or less instead. |
 | Propaganda | Creatures can't attack you unless their controller pays {2} for each creature they control that's attacking you. |
-| Quicksilver Amulet | {4}, {T}: You may put a creature card from your hand onto the battlefield. |
 | Quirion Dryad | Whenever you cast a spell that's white, blue, black, or red, put a +1/+1 counter on this. |
 | Quirion Ranger | Return a Forest you control to its owner's hand: Untap target creature. Activate only once each turn. |
 | Reconnaissance | {0}: Remove target attacking creature you control from combat and untap it. |
@@ -220,7 +199,6 @@
 | Shifting Sky | All nonland permanents are the chosen color. |
 | Sindbad | {T}: Draw a card and reveal it. If it isn't a land card, discard it. |
 | Skizzik | At the beginning of the end step, if this wasn't kicked, sacrifice it. |
-| Skyshroud Ranger | {T}: You may put a land card from your hand onto the battlefield. Activate only as a sorcery. |
 | Slate of Ancestry | {4}, {T}, Discard your hand: Draw a card for each creature you control. |
 | Sleeper Agent | When this enters, target opponent gains control of it. |
 | Sneaky Homunculus | this can't block or be blocked by creatures with power 2 or greater. |
@@ -229,7 +207,6 @@
 | Spawning Pool | {1}{B}: this becomes a 1/1 black Skeleton creature with "{B}: Regenerate this" until end of turn. It's still a land. |
 | Spell Blast | Counter target spell with mana value X. |
 | Spined Sliver | Whenever a Sliver becomes blocked, that Sliver gets +1/+1 until end of turn for each creature blocking it. |
-| Spirit Link | Whenever enchanted creature deals damage, you gain that much life. |
 | Spitting Slug | Whenever this blocks or becomes blocked, you may pay {1}{G}. If you do, this gains first strike until end of turn. Otherwise, each creature blocking or blocked by this gains first strike until end of turn. |
 | Spreading Algae | Enchant Swamp<br>When enchanted land becomes tapped, destroy it. |
 | Stalking Stones | {6}: this becomes a 3/3 Elemental artifact creature that's still a land. |
@@ -290,5 +267,4 @@
 | Wrath of Marit Lage | When this enters, tap all red creatures.<br>Red creatures don't untap during their controllers' untap steps. |
 | Yawgmoth Demon | At the beginning of your upkeep, you may sacrifice an artifact. If you don't, tap this and it deals 2 damage to you. |
 | Zealous Inquisitor | {1}{W}: The next 1 damage that would be dealt to this this turn is dealt to target creature instead. |
-| Zhalfirin Commander | {1}{W}{W}: Target Knight creature gets +1/+1 until end of turn. |
 | Zur's Weirding | Players play with their hands revealed.<br>If a player would draw a card, they reveal it instead. Then any other player may pay 2 life. If a player does, put that card into its owner's graveyard. Otherwise, that player draws a card. |

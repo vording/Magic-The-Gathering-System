@@ -596,7 +596,7 @@ const Engine = (() => {
         || (tr.event === 'etbOrDies' && (event === 'etb' || event === 'dies'));
       if (tr.event !== event && !alias) continue;
       if (!triggerCondOk(G, o, tr.cond, evt)) continue;
-      const bound = { player: evt.player ?? null, obj: evt.subject ?? null };
+      const bound = { player: evt.player ?? null, obj: evt.subject ?? null, amount: evt.amount ?? 0 };
       G.triggers.push({ controller: o.controller, source: id, name: o.card.name, effects: tr.effects, text: tr.text, colors: o.def.colors, optional: tr.optional, bound });
     }
   }
@@ -662,7 +662,7 @@ const Engine = (() => {
         continue;
       }
       G.stack.push({ sid: G.nextSid++, kind: 'trigger', controller: tr.controller, source: tr.source, name: tr.name, text: tr.text,
-        effects: tr.effects, targets: tr.targets ?? [], x: 0, colors: tr.colors });
+        effects: tr.effects, targets: tr.targets ?? [], x: 0, colors: tr.colors, boundObj: tr.bound?.obj ?? null, eventAmount: tr.bound?.amount ?? 0 });
       log(G, tr.controller, `${tr.name}の誘発型能力`);
     }
   }
@@ -715,7 +715,7 @@ const Engine = (() => {
         }
       }
       // 「〜をコントロールしていないとき、これを生け贄に捧げる」
-      if (o.def.sacIfNo && !bf(G, o.controller).some((x) => hasSub(obj(G, x), o.def.sacIfNo))) {
+      if (o.def.sacIfNo && !bf(G, o.controller).some((x) => (o.def.sacIfNo === 'other creature' ? x !== id && isType(obj(G, x), 'creature') : hasSub(obj(G, x), o.def.sacIfNo)))) {
         move(G, id, 'graveyard');
         changed = true;
         continue;
@@ -926,6 +926,13 @@ const Engine = (() => {
       // 選ぶ余地がなければそのまま
       if (options.length === n) { for (const id of options) move(G, id, 'graveyard'); return; }
       G.pending = { ...c, n, options };
+    } else if (c.type === 'putFromHand') {
+      const options = G.players[c.player].hand.filter((h) => {
+        const o = obj(G, h);
+        return c.what === 'basic land' ? isType(o, 'land') && o.def.supertypes.includes('basic') : isType(o, c.what);
+      });
+      if (!options.length) return;
+      G.pending = { ...c, options, optional: true };
     } else if (c.type === 'sacUnlessOther') {
       if (!onBf(G, c.id)) return;
       const options = c.how === 'discard' ? G.players[c.player].hand.filter((h) => isType(obj(G, h), c.what) || c.what === 'card')
@@ -960,6 +967,7 @@ const Engine = (() => {
     if (what.colors?.length && !what.colors.some((c) => o.def.colors.includes(c))) return false;
     if (what.subtypes?.length && !what.subtypes.some((w) => hasSub(o, w))) return false;
     if (what.cmc != null && (what.cmpGE ? (o.def.cmc ?? 0) < what.cmc : (o.def.cmc ?? 0) > what.cmc)) return false;
+    if (what.cmcX && (o.def.cmc ?? 0) > (what.x ?? 0)) return false;
     if (what.power != null && (what.powerGE ? toNum(o.def.power) < what.power : toNum(o.def.power) > what.power)) return false;
     return true;
   }
@@ -1138,6 +1146,7 @@ const Engine = (() => {
         total[e.to.player] += e.n;
         queueTrigger(G, e.src, 'combatDamagePlayer', { player: e.to.player });
         queueTrigger(G, e.src, 'dealsDamagePlayer', { player: e.to.player });
+        queueAll(G, 'creatureDamagesPlayer', { subject: e.src, player: e.to.player });
       } else {
         const t = obj(G, e.to.obj);
         t.damage += e.n;
@@ -1146,6 +1155,7 @@ const Engine = (() => {
         queueTrigger(G, e.to.obj, 'dealtDamage');
       }
       if (sc.kw.has('lifelink')) G.players[src.controller].life += e.n;
+      for (const aid of G.battlefield) if (obj(G, aid).attachedTo === e.src) queueTrigger(G, aid, 'enchantedDealsDamage', { player: e.to.player ?? null, amount: e.n });
     }
     for (const q of [0, 1]) if (total[q]) { log(G, q, `戦闘で${total[q]}点のダメージを受けた（ライフ ${G.players[q].life}）`); sfx(G, 'lifeloss'); }
   }
@@ -1181,7 +1191,7 @@ const Engine = (() => {
     const specs = spellSpecs(o, mode, kicked);
     const srcColors = o.def.colors;
     for (const s of specs) if (s && !s.optional && !targetsFor(G, p, s, null, srcColors).length) return { ok: false, reason: `${o.card.name}の対象がありません` };
-    const ac = o.def.addCost;
+    const ac = flashback && o.def.flashbackAdd ? o.def.flashbackAdd : o.def.addCost;
     if (ac) {
       if (ac.sacType && !sacOptions(G, p, ac.sacType).length) return { ok: false, reason: '追加のコストで生け贄に捧げるものがありません' };
       if (ac.discard && G.players[p].hand.filter((h) => h !== id).length < ac.discard) return { ok: false, reason: '追加のコストで捨てるカードがありません' };
@@ -1271,7 +1281,7 @@ const Engine = (() => {
     pay(G, p, info.cost, x, { exclude: id });
     // 追加のコスト
     let sacPower = 0;
-    const ac = o.def.addCost;
+    const ac = info.flashback && o.def.flashbackAdd ? o.def.flashbackAdd : o.def.addCost;
     if (ac?.sacType) {
       const opts = sacOptions(G, p, ac.sacType);
       const sid = opts.includes(Number(sacrifice)) ? Number(sacrifice) : opts[0];
@@ -1498,6 +1508,7 @@ const Engine = (() => {
       else if (c.ref === 'sacPower') n = item.sacPower ?? 0;
       else if (c.ref === 'targetCmc') n = tgt != null && obj(G, tgt) ? obj(G, tgt).def.cmc ?? 0 : 0;
       else if (c.ref === 'lastDamage') n = item.lastDamage ?? 0;
+      else if (c.ref === 'eventAmount') n = item.eventAmount ?? 0;
       else n = countOf(G, p, c, src, t?.player ?? null);
       return Math.max(0, n) * (fx.amount.mult ?? 1);
     };
@@ -1676,6 +1687,13 @@ const Engine = (() => {
         if (top.length > 1) G.choices.push({ type: 'reorder', player: p, options: top, reason: by });
         break;
       }
+      case 'putFromHand': G.choices.push({ type: 'putFromHand', player: p, what: fx.what, tapped: fx.tapped, reason: by }); break;
+      case 'drawBoundController': {
+        const b = item.targets.find((a) => a?.obj != null)?.obj ?? item.boundObj;
+        const w = b != null ? obj(G, b)?.lastController ?? obj(G, b)?.controller : null;
+        if (w != null) draw(G, w, 1);
+        break;
+      }
       case 'sacUnlessOther':
         if (onBf(G, src)) G.choices.push({ type: 'sacUnlessOther', player: p, id: src, how: fx.how, n: fx.n, what: fx.what, reason: by });
         break;
@@ -1785,7 +1803,7 @@ const Engine = (() => {
         break;
       }
       case 'search':
-        for (let i = 0; i < val(fx.n); i++) G.choices.push({ type: 'search', player: p, what: fx.filter, to: fx.to, tapped: fx.tapped, reason: by, optional: true });
+        for (let i = 0; i < val(fx.n); i++) G.choices.push({ type: 'search', player: p, what: { ...fx.filter, x }, to: fx.to, tapped: fx.tapped, reason: by, optional: true });
         break;
       case 'discardHand': for (const w of fx.target.players.map(rel)) for (const id of [...G.players[w].hand]) discardCard(G, id); break;
       case 'discardRandom': {
@@ -2012,6 +2030,14 @@ const Engine = (() => {
         log(G, p, `上から${pend.options.length}枚を並べ替えた`);
         return;
       }
+      case 'putFromHand': {
+        G.pending = null;
+        const id = Number(a.ids?.[0]);
+        if (a.type !== 'choose' || !a.ids?.length) return; // 出さない
+        if (!pend.options.includes(id)) fail('カードを選んでください');
+        move(G, id, 'battlefield', { controller: p, tapped: pend.tapped });
+        return;
+      }
       case 'sacUnlessOther': {
         G.pending = null;
         const ids = (a.ids ?? []).map(Number);
@@ -2163,8 +2189,8 @@ const Engine = (() => {
       'untapLands', 'tapAllOpp', 'equip', 'pumpAttached', 'bounceAttached', 'addNamed', 'sacIfNoCounters', 'sacAll', 'untapLandsN', 'exileGrave',
       'exileGraveAll', 'scry', 'lookPick', 'reorder', 'payThen', 'tapAll', 'unblockable', 'cop', 'payOr', 'topdeck', 'returnOwn',
       'animate', 'threaten', 'giveControl', 'extraTurn', 'playerShroud', 'drawPlayer', 'delayed', 'sacUnlessOther', 'exileSameName', 'shuffleGraveIn',
-      'millHalf', 'bounceAllOwned'],
-    triggers: ['attacksAlone', 'blocksOrBlockedBy', 'blockedBy', 'eachDrawstep', 'drawCard', 'discard', 'damagedDies', 'etb', 'dies', 'etbOrDies', 'blocksOrBlocked', 'leaves', 'upkeep', 'eachUpkeep', 'endstep', 'eachEndstep', 'drawstep', 'attacks', 'blocks', 'attacksOrBlocks', 'becomesBlocked',
+      'millHalf', 'bounceAllOwned', 'putFromHand', 'drawBoundController'],
+    triggers: ['creatureDamagesPlayer', 'enchantedDealsDamage', 'attacksAlone', 'blocksOrBlockedBy', 'blockedBy', 'eachDrawstep', 'drawCard', 'discard', 'damagedDies', 'etb', 'dies', 'etbOrDies', 'blocksOrBlocked', 'leaves', 'upkeep', 'eachUpkeep', 'endstep', 'eachEndstep', 'drawstep', 'attacks', 'blocks', 'attacksOrBlocks', 'becomesBlocked',
       'combatDamagePlayer', 'dealsDamagePlayer', 'dealtDamage', 'creatureEnters', 'creatureDies', 'cast', 'cycled'],
     statics: ['self', 'attached', 'lord', 'costMod', 'moat'],
   };

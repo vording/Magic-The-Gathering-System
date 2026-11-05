@@ -117,7 +117,7 @@ const CardText = (() => {
       let what = m[3] === 'plains' ? 'plains' : m[3].replace(/(ies)$/, 'y').replace(/ves$/, 'f').replace(/s$/, '');
       return { zone: 'battlefield', who, what, adj: m[2] ?? null, other: !!m[1] };
     }
-    if ((m = /^(?:basic )?land types among lands you control$/.exec(t))) return { ref: 'domain' };
+    if ((m = /^(?:basic )?land types? among lands you control$/.exec(t))) return { ref: 'domain' };
     return null;
   }
 
@@ -135,6 +135,7 @@ const CardText = (() => {
       if (!c) return null;
       return { s: `${m[1]}x damage to ${m[2]}`, amount: { count: c } };
     }
+    if (/^you gain that much life$/.test(s)) return { s: 'you gain x life', amount: { count: { ref: 'eventAmount' } } };
     if (/^you gain life equal to the damage dealt this way$/.test(s)) return { s: 'you gain x life', amount: { count: { ref: 'lastDamage' } } };
     if ((m = /^(.*?)\b(damage|life|cards?) equal to (the number of [^,]+?|its power|its toughness|that creature's power|the sacrificed creature's power|your life total)( to .+)?$/.exec(s))) {
       const c = parseCount(m[3]);
@@ -197,6 +198,7 @@ const CardText = (() => {
         if (a.startsWith('non')) f.non.push(a.slice(3));
         else if (COLOR_WORDS[a]) f.colors.push(COLOR_WORDS[a]);
         else if (['tapped', 'untapped', 'attacking', 'blocking'].includes(a)) f.state.push(a);
+        else if (/^[a-z-]+$/.test(a) && base === 'creature') f.subtypes = [...(f.subtypes ?? []), a];
         else return null;
       }
       if (COLOR_WORDS[base]) { f.colors.push(COLOR_WORDS[base]); continue; } // 「blue or red creature」の blue
@@ -339,15 +341,15 @@ const CardText = (() => {
     }
     if ((m = /^sacrifice an? (creature|land|artifact|enchantment|permanent)$/.exec(s))) return { type: 'sacrifice', n: 1, what: m[1], target: { kind: 'player', players: ['me'], auto: true } };
     // 探す（「Goblin card」「creature card with mana value 6 or greater」「Swamp or Mountain card」「card」）
-    if ((m = /^search your library for (a|an|up to (?:one|two|three|four))(?: (.+?))? cards?(?:, reveal (?:it|that card|them|those cards))?,? (?:and )?put (?:it|that card|them|those cards) (into your hand|onto the battlefield(?: tapped)?|on top of your library|into your graveyard),? (?:then shuffle(?: your library)?|and shuffle)(?: afterward)?$/.exec(s))) {
+    if ((m = /^search your library for (a|an|up to (?:one|two|three|four))(?: (.+?))? cards?( with (?:mana value|power) (?:\d+|x) or (?:greater|less))?(?:, reveal (?:it|that card|them|those cards))?,? (?:and )?put (?:it|that card|them|those cards) (into your hand|onto the battlefield(?: tapped)?|on top of your library|into your graveyard),? (?:then shuffle(?: your library)?|and shuffle)(?: afterward)?$/.exec(s))) {
       const nmax = m[1].startsWith('up to') ? num(m[1].split(' ')[2]) : 1;
-      const filter = searchFilter(m[2] ?? '');
+      const filter = searchFilter(`${m[2] ?? ''}${m[3] ?? ''}`.trim());
       if (!filter) return null;
-      const dest = m[3].startsWith('into your hand') ? 'hand' : m[3].startsWith('onto') ? 'battlefield' : m[3].startsWith('on top') ? 'top' : 'graveyard';
-      return { type: 'search', n: nmax, filter, to: dest, tapped: m[3].endsWith('tapped') };
+      const dest = m[4].startsWith('into your hand') ? 'hand' : m[4].startsWith('onto') ? 'battlefield' : m[4].startsWith('on top') ? 'top' : 'graveyard';
+      return { type: 'search', n: nmax, filter, to: dest, tapped: m[4].endsWith('tapped') };
     }
     // 墓地から戻す
-    if ((m = /^return target (creature |artifact |enchantment |instant |sorcery |land |instant or sorcery |artifact or enchantment )?card from your graveyard to (your hand|the battlefield|the top of your library)$/.exec(s))) {
+    if ((m = /^return (?:another )?target (creature |artifact |enchantment |instant |sorcery |land |instant or sorcery |artifact or enchantment )?card from your graveyard to (your hand|the battlefield|the top of your library)$/.exec(s))) {
       const t = m[1]?.trim();
       const types = t ? t.split(' or ') : null;
       return { type: 'regrow', to: m[2] === 'your hand' ? 'hand' : m[2] === 'the battlefield' ? 'battlefield' : 'top', target: { kind: 'grave', filter: types ? { types, non: [], colors: [], state: [] } : null } };
@@ -387,6 +389,7 @@ const CardText = (() => {
     if (t === 'creature' || t === 'artifact' || t === 'enchantment' || t === 'land' || t === 'instant' || t === 'sorcery') return { types: [t] };
     if ((m = /^(white|blue|black|red|green) (instant|sorcery|creature|enchantment|artifact)$/.exec(t))) return { types: [m[2]], colors: [COLOR_WORDS[m[1]]] };
     if ((m = /^(creature|artifact) with mana value (\d+) or (greater|less)$/.exec(t))) return { types: [m[1]], cmc: Number(m[2]), cmpGE: m[3] === 'greater' };
+    if ((m = /^(creature|artifact) with mana value x or less$/.exec(t))) return { types: [m[1]], cmcX: true };
     if ((m = /^creature with power (\d+) or (greater|less)$/.exec(t))) return { types: ['creature'], power: Number(m[1]), powerGE: m[2] === 'greater' };
     if ((m = /^(\w+) permanent$/.exec(t))) return { subtypes: [m[1]] };
     if ((m = /^(\w+) or (\w+)$/.exec(t)) && !['creature', 'artifact'].includes(m[1])) return { subtypes: [m[1], m[2]] };
@@ -413,6 +416,14 @@ const CardText = (() => {
     }
     // 再生
     if (s === 'regenerate this') return { type: 'regen', self: true };
+    if ((m = /^regenerate target (.+)$/.exec(s)) && m[1] !== 'creature') {
+      const t = targetPhrase(m[1]);
+      return t ? { type: 'regen', target: t } : null;
+    }
+    if ((m = /^(?:you may )?put an? (basic land|land|creature|artifact|enchantment) card from your hand onto the battlefield( tapped)?$/.exec(s))) {
+      return { type: 'putFromHand', what: m[1], tapped: !!m[2] };
+    }
+    if (/^that creature's controller (?:may )?draws? a card$/.test(s)) return { type: 'drawBoundController' };
     if (s === 'regenerate target creature') return { type: 'regen', target: { kind: 'card', filter: { types: ['creature'], non: [], colors: [], state: [] } } };
     // 自分の修整
     if ((m = /^this gets ([+-]\d+)\/([+-]\d+)(?: and gains ([a-z ,]+?))? until end of turn$/.exec(s))) {
@@ -565,6 +576,9 @@ const CardText = (() => {
     [/^whenever this attacks or blocks$/, 'attacksOrBlocks'],
     [/^whenever this becomes blocked$/, 'becomesBlocked'],
     [/^whenever this attacks alone$/, 'attacksAlone'],
+    [/^whenever a creature you control deals combat damage to (a player|an opponent)$/, 'creatureDamagesPlayer', () => ({ who: 'you' }), 'player'],
+    [/^whenever enchanted creature deals (?:combat )?damage(?: to (a player|an opponent))?$/, 'enchantedDealsDamage', (m) => ({ opp: m[1] === 'an opponent' }), 'player'],
+    [/^whenever (an opponent|a player) casts? (?:a|an) (white|blue|black|red|green) spell$/, 'cast', (m) => ({ who: m[1] === 'a player' ? 'all' : 'opp', what: m[2] }), 'player'],
     [/^whenever this blocks or becomes blocked$/, 'blocksOrBlocked'],
     [/^whenever this blocks or becomes blocked by an? (non-?\w+ )?creature$/, 'blocksOrBlockedBy', (m) => ({ otherNot: m[1]?.trim().replace(/^non-?/, '') ?? null }), 'obj'],
     [/^whenever this becomes blocked by a creature$/, 'blockedBy', null, 'obj'],
@@ -590,6 +604,8 @@ const CardText = (() => {
     if ((m = /^(other )?([a-z]+?)s get ([+-]\d+)\/([+-]\d+)(?: and have ([a-z ,]+))?$/.exec(s)) && m[2] !== 'creature') {
       return { kind: 'lord', other: !!m[1], word: m[2], scope: 'all', p: Number(m[3]), t: Number(m[4]), kw: kwList(m[5]) };
     }
+    if ((m = /^(other )?(goblin|elf|zombie|merfolk|sliver|soldier|wizard|knight|beast|dragon|cleric|wall)s? (?:creatures )?you control have ([a-z ,]+)$/.exec(s))) return { kind: 'lord', other: !!m[1], word: m[2], scope: 'you', p: 0, t: 0, kw: kwList(m[3]) };
+    if ((m = /^(other )?(goblin|elf|zombie|merfolk|sliver|soldier|wizard|knight|beast|dragon|cleric|wall|white|blue|black|red|green)s? creatures have ([a-z ,]+)$/.exec(s))) return { kind: 'lord', other: !!m[1], word: m[2], scope: 'all', p: 0, t: 0, kw: kwList(m[3]) };
     if ((m = /^(other )?creatures you control have ([a-z ,]+)$/.exec(s))) return { kind: 'lord', other: !!m[1], word: null, scope: 'you', p: 0, t: 0, kw: kwList(m[2]) };
     // オーラ・装備品
     if ((m = /^(enchanted|equipped) creature gets ([+-]\d+)\/([+-]\d+)(?: and has ([a-z ,]+))?$/.exec(s))) {
@@ -685,6 +701,7 @@ const CardText = (() => {
     if ((m = /^this enters(?: the battlefield)? with (\w+) \+1\/\+1 counters? on it$/.exec(s))) return { kind: 'etbCounters', n: num(m[1]) };
     if ((m = /^this enters(?: the battlefield)? with (\w+) (\w+) counters? on it$/.exec(s))) return { kind: 'etbNamed', n: num(m[1]), name: m[2] };
     if ((m = /^when you control no (\w+), sacrifice this$/.exec(s))) return { kind: 'sacIfNo', what: m[1].replace(/s$/, '') };
+    if (s === 'when you control no other creatures, sacrifice this') return { kind: 'sacIfNo', what: 'other creature' };
     return null;
   }
 
@@ -799,9 +816,18 @@ const CardText = (() => {
       }
       modal = null;
       if (/^choose one —$/i.test(line)) { def.modes = []; modal = def.modes; continue; }
+      const fb = /^flashback[—\s-]+(.+?)\.?$/i.exec(line);
+      if (fb && !/^\{[^ ]+\}$/.test(fb[1])) {
+        const c = parseCost(fb[1].replace(/^sacrifice an? /i, 'sacrifice a '));
+        if (c) {
+          def.flashback = c.mana || '{0}';
+          def.flashbackAdd = { ...c, mana: '' };
+          continue;
+        }
+      }
       if (keywordLine(line, def)) continue;
       // 追加のコスト
-      const ac = /^as an additional cost to cast this(?: spell)?, (sacrifice a creature|sacrifice a land|discard a card|pay (\d+) life)\.?$/i.exec(line);
+      const ac = /^as an additional cost to cast this(?: spell)?, (sacrifice an? [a-z]+|discard a card|pay (\d+) life)\.?$/i.exec(line);
       if (ac) { def.addCost = parseCost(ac[1]); continue; }
       if (/^this (?:spell )?can't be countered\.?$/i.test(line)) { def.uncounterable = true; continue; }
       if (/^this enters(?: the battlefield)? tapped\.?$/.test(lower)) { def.entersTapped = true; continue; }
@@ -812,7 +838,8 @@ const CardText = (() => {
       const trig = /^((?:when|whenever|at) [^,]+), (.+)$/i.exec(line);
       if (trig) {
         const cond = trig[1].toLowerCase();
-        const hit = TRIGGERS.map((t) => [t, t[0].exec(cond)]).find(([, m]) => m);
+        const alt = cond.startsWith('whenever ') ? cond.replace(/^whenever /, 'when ') : cond.replace(/^when /, 'whenever ');
+        const hit = TRIGGERS.map((t) => [t, t[0].exec(cond) ?? t[0].exec(alt)]).find(([, m]) => m);
         let body = trig[2].replace(/^it /i, 'this ').replace(/ on it\.?$/i, ' on this.');
         // 「if 〜」で始まる条件付きの誘発（ソーサリー・タイミングの確認など）は読まない
         const bound = hit ? bindTrigger(body.replace(/^you may (?!pay)/i, ''), hit[0][3]) : null;
@@ -826,6 +853,9 @@ const CardText = (() => {
           def.triggers.push({ event: hit[0][1], cond: ifUntapped ? { ...(cond ?? {}), ifUntapped: true } : cond, effects: fx, optional: /^you may /i.test(body), text: line });
           continue;
         }
+        // 「When you control no Islands, sacrifice this」などは常在型能力として読む
+        const st = permanent ? staticOf(line.replace(/\.$/, '')) : null;
+        if (st && st.kind === 'sacIfNo') { def.sacIfNo = st.what; continue; }
         def.manual.push(line);
         continue;
       }

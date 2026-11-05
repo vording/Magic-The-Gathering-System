@@ -373,9 +373,6 @@ const AI = (() => {
       }
       if (best != null) { blocks[best] = a; used.add(best); } else unblocked.push(a);
     }
-    // 単独ではブロックできないもの
-    const solo = Object.keys(blocks).map(Number);
-    if (solo.length === 1 && (E().ch(G, solo[0]).notAlone || E().ch(G, solo[0]).notAloneBlock)) { delete blocks[solo[0]]; used.delete(solo[0]); }
     let incoming = unblocked.reduce((s, a) => s + Math.max(0, E().ch(G, a).p), 0);
     for (const a of unblocked) {
       if (incoming < G.players[p].life) break;
@@ -386,6 +383,9 @@ const AI = (() => {
       used.add(b);
       if (!E().ch(G, a).kw.has('trample')) incoming -= Math.max(0, E().ch(G, a).p);
     }
+    // 単独ではブロックできないもの（最後に1体だけなら外す）
+    const solo = Object.keys(blocks).map(Number);
+    if (solo.length === 1 && (E().ch(G, solo[0]).notAlone || E().ch(G, solo[0]).notAloneBlock)) delete blocks[solo[0]];
     return blocks;
   }
 
@@ -545,6 +545,7 @@ const AI = (() => {
       }
       case 'discard': return { type: 'choose', ids: chooseDiscard(G, p, pend.n, pend.options) };
       case 'search': return { type: 'choose', ids: [chooseSearch(G, p, pend.options)] };
+      case 'putFromHand': return { type: 'choose', ids: [[...pend.options].sort((a, b) => (o(G, b).def.cmc || 0) - (o(G, a).def.cmc || 0))[0]] };
       case 'sacUnlessOther': {
         const keep = value(G, pend.id) >= 4;
         const opts = [...pend.options].sort((a, b) => value(G, a) - value(G, b)).slice(0, pend.n);
