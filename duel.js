@@ -527,6 +527,15 @@ function detailText(id) {
 
 // ---------- 描画 ----------
 
+// PC ではフェイズの一覧を戦場と手札の間の横長のバーに、スマホでは左列（下のバー）に置く
+function placePhases() {
+  const ph = $('phases');
+  const want = phone() ? $('col-left') : document.querySelector('.board');
+  if (ph.parentElement === want) return;
+  if (phone()) want.insertBefore(ph, want.querySelector('.phase-actions'));
+  else want.insertBefore(ph, want.querySelector('.hand-area'));
+}
+
 function render() {
   renderWaiting();
   if (!G) return;
@@ -538,7 +547,10 @@ function render() {
   $('turn-label').textContent = G.turn ? `ターン ${G.turn}（${G.active === ME ? 'あなた' : opp.name}）` : '初手';
   $('land-count').textContent = G.turn && G.active === ME ? `土地 ${me.landsPlayed}/1` : '';
   $('phase-hint').textContent = hintText(n);
-  $('phases').replaceChildren(...Engine.STEPS.map((s) => {
+  const turnTag = document.createElement('span');
+  turnTag.className = 'phase-turn';
+  turnTag.textContent = $('turn-label').textContent;
+  $('phases').replaceChildren(turnTag, ...Engine.STEPS.map((s) => {
     const b = document.createElement('button');
     b.textContent = Engine.STEP_NAMES[s];
     b.dataset.phase = PHASE_ICON[s] ?? s;
@@ -577,6 +589,8 @@ function render() {
   $('opp-pool').replaceChildren(...poolEls(opp.pool));
   $('opp-status').textContent = oppStatus(n);
   $('opp-area').classList.toggle('active-turn', G.active === OPP && G.turn > 0);
+  $('opp-player').classList.toggle('active', G.active === OPP && G.turn > 0);
+  $('my-player').classList.toggle('active', G.active === ME && G.turn > 0);
 
   // 戦場・手札
   const row = (p, lands) => G.battlefield.filter((id) => G.objects[id].controller === p && G.objects[id].def.types.includes('land') === lands);
@@ -1189,6 +1203,8 @@ function init() {
     else if (e.key === 'Enter') { e.preventDefault(); ui.autoTurn = G.turn; act(ME, { type: 'pass' }); }
   });
   window.addEventListener('phonesheet', () => { hideMenu(); if (G) renderLog(); });
+  placePhases();
+  window.addEventListener('resize', placePhases);
   const requested = Number(new URLSearchParams(location.search).get('deck'));
   if (online() && duel.code) {
     // 再読み込み：同じ部屋に戻る

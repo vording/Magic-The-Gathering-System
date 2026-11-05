@@ -526,6 +526,7 @@ html.phone .col-player {
   overflow: visible;
 }
 html.phone .col-player .avatar { width: 24px; flex: none; }
+html.phone .player-block.me { display: contents; }
 html.phone .player-block.opp {
   flex: 1 1 100%;
   flex-direction: row;
@@ -664,7 +665,7 @@ html.phone .viewer-cards .card { --card-w: 80px; }
   html.phone .hand, html.phone body.online .hand { --card-w: 50px; }
   html.phone .col-player { grid-column: 1; grid-row: 1; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; overflow-y: auto; }
   html.phone .player-block.opp { flex: none; flex-wrap: wrap; gap: 4px 8px; }
-  html.phone .col-player > .life { flex-wrap: wrap; }
+  html.phone .col-player .life { flex-wrap: wrap; }
   html.phone .piles { flex-wrap: wrap; gap: 4px 10px; }
   html.phone .col-left { grid-column: 1; grid-row: 2; grid-template-columns: auto minmax(0, 1fr); }
   html.phone .phases { display: none; }
