@@ -104,6 +104,66 @@ const tests = {
     assert.equal(CardText.compile(L.Forest).activated[0].mana.choices[0], 'G');
     for (const c of Object.values(K)) assert.equal(CardText.compile(c).support, 'full', c.name);
   },
+  'pain land: colored mana is a mana ability (no stack) and deals damage only for colored mana'() {
+    const wastes = C('Adarkar Wastes', 'Land', '', '{T}: Add {C}.\n{T}: Add {W} or {U}. Adarkar Wastes deals 1 damage to you.');
+    const d = CardText.compile(wastes);
+    assert.ok(d.activated[1].mana, 'colored ability is a mana ability');
+    // 相手の呪文に対応して、手でマナを出してもスタックは増えず、優先権も自分のまま
+    const G = setup({ p0: { hand: [K.bolt], bf: [L.Mountain] }, p1: { hand: [K.counterspell], bf: [wastes, L.Island] } });
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Lightning Bolt'), targets: [{ player: 1 }] }));
+    ok(Engine.perform(G, 0, { type: 'pass' }));
+    ok(Engine.perform(G, 1, { type: 'activate', id: id(G, 'Adarkar Wastes'), index: 1, color: 'U' }));
+    assert.equal(G.stack.length, 1);
+    assert.equal(G.priority, 1);
+    assert.equal(G.players[1].pool.U, 1);
+    assert.equal(G.players[1].life, 19);
+    ok(Engine.perform(G, 1, { type: 'cast', id: id(G, 'Counterspell'), targets: [{ stack: G.stack[0].sid }] }));
+    assert.equal(G.stack.length, 2);
+    // 自動の支払い：色が要るときだけダメージ、不特定マナなら無色で払って痛みなし
+    const H = setup({ p0: { hand: [K.prodigal], bf: [wastes, L.Island, L.Island] } });
+    ok(Engine.perform(H, 0, { type: 'cast', id: id(H, 'Prodigal Sorcerer') }));
+    assert.equal(H.players[0].life, 20);
+    const draw2 = C('Twin Insight', 'Sorcery', '{U}{U}', 'Draw a card.');
+    const J = setup({ p0: { hand: [draw2], bf: [wastes, L.Island] } });
+    ok(Engine.perform(J, 0, { type: 'cast', id: id(J, 'Twin Insight') }));
+    assert.equal(J.players[0].life, 19);
+  },
+  'mana undo: tapping a land for mana can be undone until something else happens'() {
+    const wastes = C('Adarkar Wastes', 'Land', '', '{T}: Add {C}.\n{T}: Add {W} or {U}. Adarkar Wastes deals 1 damage to you.');
+    const G = setup({ p0: { hand: [K.counterspell, K.bears], bf: [L.Island, wastes, L.Forest] } });
+    const isl = id(G, 'Island');
+    ok(Engine.perform(G, 0, { type: 'activate', id: isl, index: 0 }));
+    ok(Engine.perform(G, 0, { type: 'activate', id: id(G, 'Adarkar Wastes'), index: 1, color: 'U' }));
+    assert.equal(G.players[0].pool.U, 2);
+    assert.equal(G.players[0].life, 19);
+    assert.ok(Engine.canUndoMana(G, 0));
+    assert.ok(!Engine.canUndoMana(G, 1));
+    ok(Engine.perform(G, 0, { type: 'undoMana' }));
+    assert.equal(G.players[0].pool.U, 1);
+    assert.equal(G.players[0].life, 20);
+    assert.equal(G.objects[id(G, 'Adarkar Wastes')].tapped, false);
+    ok(Engine.perform(G, 0, { type: 'undoMana' }));
+    assert.equal(G.players[0].pool.U, 0);
+    assert.equal(G.objects[isl].tapped, false);
+    assert.ok(!Engine.perform(G, 0, { type: 'undoMana' }).ok);
+    // 呪文を唱えたら巻き戻せない
+    ok(Engine.perform(G, 0, { type: 'activate', id: id(G, 'Forest'), index: 0 }));
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Grizzly Bears') }));
+    assert.ok(!Engine.canUndoMana(G, 0));
+  },
+  'pool shortfall: what is still owed after the floating mana'() {
+    const G = setup({ p0: { bf: [L.Island] } });
+    let r = Engine.poolShortfall(G, 0, '{1}{U}{U}');
+    assert.equal(r.text, '{1}{U}{U}');
+    G.players[0].pool.U = 1;
+    G.players[0].pool.R = 1;
+    r = Engine.poolShortfall(G, 0, '{1}{U}{U}');
+    assert.equal(r.text, '{U}');
+    assert.deepEqual(r.colors, ['U']);
+    G.players[0].pool.U = 2;
+    assert.ok(Engine.poolShortfall(G, 0, '{1}{U}{U}').done);
+    assert.equal(Engine.poolShortfall(G, 0, '{X}{R}', 3).text, '{1}');
+  },
   'bolt to face resolves after both pass'() {
     const G = setup({ p0: { hand: [K.bolt], bf: [L.Mountain] } });
     ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Lightning Bolt'), targets: [{ player: 1 }] }));

@@ -409,12 +409,14 @@ const Engine = (() => {
       if (o.tapped) continue;
       if (isType(o, 'creature') && isSick(G, id)) continue;
       abilitiesOf(G, id).forEach((a, i) => {
-        if (!a.mana || !a.cost.tap || a.cost.mana || a.cost.sacSelf || a.cost.life || a.cost.discard || a.cost.sacType) return;
+        if (!a.mana || !a.cost.tap || a.cost.mana || a.cost.sacSelf || a.cost.life || a.cost.discard || a.cost.sacType || a.cost.removeCounter) return;
         const m = manaNow(G, id, a.mana);
         if (!m) return;
-        out.push({ id, index: i, choices: m.fixed ?? m.choices, amount: m.amount, fixed: !!m.fixed, land: isType(o, 'land') });
+        out.push({ id, index: i, choices: m.fixed ?? m.choices, amount: m.amount, fixed: !!m.fixed, land: isType(o, 'land'), extra: a.manaExtra ?? null });
       });
     }
+    // ペインランド：痛みのない能力で出せる色（不特定マナや無色はそちらで払う）
+    for (const s of out) if (s.extra) s.painless = [...new Set(out.filter((t) => t.id === s.id && !t.extra).flatMap((t) => t.choices))];
     // 1つのものに複数のマナ能力があっても、使えるのは1つ（どれもタップするため）
     const seen = new Map();
     for (const s of out) {
@@ -504,7 +506,7 @@ const Engine = (() => {
     let need = generic;
     for (const i of order) {
       if (!need) break;
-      used[i] = units[i].colors[0];
+      used[i] = units[i].src?.painless?.[0] ?? units[i].colors[0];
       if (units[i].src) tappedSrc.add(units[i].src.id);
       need--;
     }
@@ -516,7 +518,7 @@ const Engine = (() => {
     if (u.pool) return 0;
     if (tapped.has(u.src.id)) return 1;
     const need = Math.min(...u.src.choices.map((c) => demand[c] ?? 0));
-    return 2 + need * 2 + (u.src.land ? 0 : 1) + u.src.choices.length / 10;
+    return 2 + need * 2 + (u.src.land ? 0 : 1) + u.src.choices.length / 10 + (u.src.extra ? 1.5 : 0);
   };
   // 手札の呪文と、戦場のもののマナ能力以外の起動コストに出てくる色の数
   function colorDemand(G, p, exclude) {
@@ -546,6 +548,8 @@ const Engine = (() => {
     for (const { src, spent, colors } of tapped.values()) {
       obj(G, src.id).tapped = true;
       onTapped(G, src.id, true);
+      // ペインランドの色マナを使ったら、ダメージなどの効果も起こる
+      if (src.extra && !(src.painless?.length && colors.every((c) => src.painless.includes(c)))) manaExtraEffects(G, p, src.id, src.extra);
       // 出たマナのうち、使わなかった分
       const produced = src.fixed ? [...src.choices] : Array(src.amount).fill(colors[0] ?? src.choices[0]);
       for (const c of colors) { const k = produced.indexOf(c); if (k >= 0) produced.splice(k, 1); else produced.pop(); }
@@ -1580,6 +1584,7 @@ const Engine = (() => {
     // マナ能力はスタックを使わない
     if (a.mana) {
       addMana(G, p, manaNow(G, id, a.mana) ?? a.mana, color);
+      if (a.manaExtra?.length) manaExtraEffects(G, p, id, a.manaExtra);
       return;
     }
     if (a.manaLike) {
@@ -1591,6 +1596,13 @@ const Engine = (() => {
     G.stack.push({ sid: G.nextSid++, kind: 'ability', controller: p, source: id, name: lki.name, text: a.text, effects: a.effects, targets, x, colors: lki.colors, sacPower });
     log(G, p, `${lki.name}の能力を起動${targetText(G, targets)}`);
     if (a.cycling) queueTrigger(G, id, 'cycled');
+  }
+
+  // マナ能力に付いた、対象を取らない効果（「このランドはあなたに1点のダメージを与える」など）
+  function manaExtraEffects(G, p, id, effects) {
+    const o = obj(G, id);
+    const item = { controller: p, source: id, name: o.card.name, effects, targets: [], x: 0, colors: o.def.colors };
+    for (const f of effects) resolveEffect(G, item, f, null);
   }
 
   function addMana(G, p, m, color = null) {
@@ -2110,13 +2122,67 @@ const Engine = (() => {
 
   function perform(G, p, action) {
     try {
+      if (action.type === 'undoMana') { undoMana(G, p); return { ok: true }; }
+      const rec = manaUndoRecord(G, p, action);
       doAction(G, p, action);
       run(G);
+      // 手で出したマナは、スタックに何かが乗る前なら巻き戻せる（それ以外の行動をしたら巻き戻せない）
+      if (rec && G.stack.length === rec.stackLen && !G.pending && G.winner == null && !(G.choices?.length)) (G.manaUndo ??= []).push(rec);
+      else G.manaUndo = null;
       return { ok: true };
     } catch (e) {
       if (e instanceof RuleError) return { ok: false, error: e.message };
       throw e;
     }
+  }
+
+  // ---------- マナのタップの巻き戻し（Ctrl+Z） ----------
+  // 巻き戻せるのは、タップしてマナを出すだけの能力（生け贄・カウンター・カードを引くなどがないもの。ペインランドのダメージは戻す）
+  function manaUndoRecord(G, p, a) {
+    if (a.type !== 'activate') return null;
+    const ab = abilitiesOf(G, a.id)[a.index];
+    if (!ab || !(ab.mana || ab.manaLike)) return null;
+    const c = ab.cost;
+    if (c.sacSelf || c.sacType || c.discard || c.discardSelf || c.removeCounter || c.life || c.exileSelfFromGrave) return null;
+    if (!(ab.manaExtra ?? []).every((f) => f.type === 'loseSelf')) return null;
+    const o = obj(G, a.id);
+    const pl = G.players[p];
+    return {
+      p, id: a.id, tapped: !!o.tapped, pool: { ...pl.pool }, life: pl.life, stackLen: G.stack.length,
+      used: JSON.stringify(o.used ?? {}), usedCount: JSON.stringify(o.usedCount ?? {}),
+    };
+  }
+  const canUndoMana = (G, p) => !!G.manaUndo?.length && G.manaUndo.at(-1).p === p;
+  function undoMana(G, p) {
+    if (!canUndoMana(G, p)) fail('元に戻せるマナのタップがありません');
+    const r = G.manaUndo.pop();
+    const o = obj(G, r.id);
+    const pl = G.players[p];
+    if (o && onBf(G, r.id)) {
+      o.tapped = r.tapped;
+      o.used = JSON.parse(r.used);
+      o.usedCount = JSON.parse(r.usedCount);
+    }
+    Object.assign(pl.pool, r.pool);
+    if (pl.life !== r.life) setLife(G, p, r.life);
+    log(G, p, `${o?.card.name ?? ''}のタップを取り消した`);
+    sfx(G, 'tap');
+  }
+
+  // プールのマナで払ったあとに足りない分 → { done, text: '{1}{U}' の形, colors: 足りない色 }
+  function poolShortfall(G, p, costStr, x = 0) {
+    const cost = R().parseCost(costStr ?? '', 0);
+    const pool = { ...G.players[p].pool };
+    const left = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+    for (const k of Object.keys(left)) for (let i = 0; i < cost[k]; i++) { if (pool[k] > 0) pool[k]--; else left[k]++; }
+    const hybrid = [];
+    for (const h of cost.hybrid) { const k = h.find((c) => pool[c] > 0); if (k) pool[k]--; else hybrid.push(h); }
+    let generic = cost.generic + cost.x * x;
+    const rest = Object.values(pool).reduce((a, b) => a + b, 0);
+    generic -= Math.min(generic, rest);
+    const text = `${generic ? `{${generic}}` : ''}${hybrid.map((h) => `{${h.join('/')}}`).join('')}${Object.entries(left).map(([k, n]) => `{${k}}`.repeat(n)).join('')}`;
+    const colors = [...Object.entries(left).filter(([, n]) => n).map(([k]) => k), ...hybrid.flat()];
+    return { done: !text, text, colors, generic };
   }
 
   function doAction(G, p, a) {
@@ -2464,6 +2530,8 @@ const Engine = (() => {
     };
     // ライブラリーから探している最中のカードは、探しているプレイヤーには見せる
     const shown = new Set(G.pending?.player === p && ['search', 'chooseHand', 'scry', 'lookPick', 'reorder'].includes(G.pending.type) ? G.pending.options : []);
+    // 探しているプレイヤーには、ライブラリー全体を見せる
+    if (G.pending?.player === p && G.pending.type === 'search') for (const id of G.players[p].library) shown.add(id);
     // 公開したカード（束に分ける・束を選ぶ）は両方のプレイヤーに見える
     if (G.pending?.type === 'separate') for (const id of G.pending.options) shown.add(id);
     if (G.pending?.type === 'choosePile') for (const id of G.pending.piles.flat()) shown.add(id);
@@ -2506,7 +2574,7 @@ const Engine = (() => {
   return {
     SUPPORTED, unsupported, countOf, abilitiesOf,
     STEPS, STEP_NAMES, create, perform, needs, run,
-    ch, cv, isSick, canAttack, canBlock, castInfo, activations, targetsFor, hasPlayable, planPayment, canPay, manaSources, maxX,
+    ch, cv, isSick, canAttack, canBlock, castInfo, activations, targetsFor, hasPlayable, planPayment, canPay, manaSources, maxX, canUndoMana, poolShortfall,
     sorceryTiming, isType: (G, id, t) => isType(obj(G, id), t), view, specOf, spellSpecs,
   };
 })();

@@ -9,9 +9,9 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="theme.css?v=28">
   <link rel="stylesheet" href="play.css?v=45">
-  <link rel="stylesheet" href="duel.css?v=6">
+  <link rel="stylesheet" href="duel.css?v=7">
   <link rel="stylesheet" href="metal.css?v=1">
-  <script src="i18n.js?v=24"></script>
+  <script src="i18n.js?v=26"></script>
   <script src="device.js?v=1"></script>
   <script src="felt.js?v=7"></script>
   <script src="zoom.js?v=2"></script>
@@ -46,6 +46,7 @@
           <button id="phase-current" class="phase-current" disabled></button>
           <button id="next-phase" class="primary" title="Space">パス</button>
           <button id="end-turn" title="Enter：相手が何かするか、自分の次のターンまで自動でパス">ターン終了まで</button>
+          <button id="undo-mana" hidden title="Ctrl+Z：スタックに何かが乗る前なら、マナのためのタップを取り消す">元に戻す（Ctrl+Z）</button>
         </div>
       </aside>
 
@@ -154,9 +155,9 @@
         </section>
         <p class="hint">
           手札: クリックで土地をプレイ・呪文を唱える<br>
-          戦場: クリックで能力を起動（攻撃・ブロックの指定中は選ぶ）<br>
-          右クリック／長押しで詳細・メニュー<br>
-          マナは自動で支払われます
+          土地: クリックでマナを出す（W＋クリックで色を自動で選ぶ・Ctrl+Z で取り消し）<br>
+          呪文: クリックすると「マナを支払ってください」→ 土地をクリック（「自動で支払う」も可）<br>
+          右クリック／長押しで詳細・メニュー
         </p>
       </aside>
     </main>
@@ -237,9 +238,9 @@
   <script src="net.js?v=4"></script>
   <script src="rules.js?v=3"></script>
   <script src="cards.js?v=1"></script>
-  <script src="cardtext.js?v=7"></script>
-  <script src="engine.js?v=8"></script>
+  <script src="cardtext.js?v=8"></script>
+  <script src="engine.js?v=10"></script>
   <script src="ai.js?v=7"></script>
-  <script src="duel.js?v=8"></script>
+  <script src="duel.js?v=10"></script>
 </body>
 </html>

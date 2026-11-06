@@ -43,6 +43,8 @@ const ui = {
   blockSel: null,
   picks: new Set(), // 手札から選ぶ（ボトム・捨てる）
   targeting: null, // { kind: 'cast' | 'activate', id, index, specs, i, targets, x, srcColors }
+  paying: null, // 「マナを支払ってください」：{ action, cost, x, name }。土地をクリックして払う
+  wHeld: false, // W キーを押している：土地をクリックすると、色を選ばずに（いま足りない色を優先して）マナを出す
   autoTurn: null, // 「ターン終了まで」：このターンが終わるまで自動でパス
   stopsAll: (() => { try { return localStorage.getItem(STOPS_KEY) === 'on'; } catch { return false; } })(),
 };
@@ -241,7 +243,7 @@ function tick() {
     timer = setTimeout(() => act(n.player, opponentDecide(n)), delay + wait);
     return;
   }
-  if (n.type === 'priority' && !ui.targeting && !awaiting && !shouldStop()) {
+  if (n.type === 'priority' && !ui.targeting && !ui.paying && !awaiting && !floating() && !shouldStop()) {
     timer = setTimeout(() => act(ME, { type: 'pass' }), 160 + wait);
   }
 }
@@ -256,6 +258,9 @@ function opponentDecide(n) {
   }
   return AI.decide(G, n.player);
 }
+
+// マナ・プールにマナが浮いているか（浮いている間は自動でパスしない）
+const floating = () => Object.values(G.players[ME].pool).some((k) => k > 0);
 
 // 自分に優先権があるとき、止まって待つか（false なら自動でパス）
 function shouldStop() {
@@ -282,6 +287,7 @@ function onHandClick(id) {
   const n = Engine.needs(G);
   if (n?.player === ME && ['bottom', 'discard'].includes(n.type)) return togglePick(id, n.pending.n);
   if (n?.type !== 'priority' || n.player !== ME) return toast('今は唱えられません');
+  if (ui.paying) return toast('マナを支払うか、キャンセル（Esc）してください');
   const o = G.objects[id];
   if (o.def.types.includes('land')) return act(ME, { type: 'playLand', id });
   startCast(id);
@@ -342,9 +348,10 @@ function startActivate(id, index) {
   if (a.mana) {
     const m = ab.mana;
     if (m.choices?.length > 1) {
-      return showMenu(m.choices.map((c) => [`{${c}} を出す`, () => act(ME, { type: 'activate', id, index, color: c })]), lastPoint.x, lastPoint.y);
+      return showMenu(m.choices.map((c) => [`{${c}} を出す`, () => { act(ME, { type: 'activate', id, index, color: c }); continuePayment(); }]), lastPoint.x, lastPoint.y);
     }
-    return act(ME, { type: 'activate', id, index });
+    act(ME, { type: 'activate', id, index });
+    return continuePayment();
   }
   let x = 0;
   if (a.x) {
@@ -383,8 +390,80 @@ function nextTarget() {
     return;
   }
   ui.targeting = null;
-  if (t.kind === 'cast') act(ME, { type: 'cast', id: t.id, targets: t.targets, x: t.x, flashback: t.flashback, mode: t.mode, kicked: t.kicked, sacrifice: t.sacrifice, discard: t.discard });
-  else act(ME, { type: 'activate', id: t.id, index: t.index, targets: t.targets, x: t.x, discard: t.discard });
+  if (t.kind === 'cast') beginPayment({ type: 'cast', id: t.id, targets: t.targets, x: t.x, flashback: t.flashback, mode: t.mode, kicked: t.kicked, sacrifice: t.sacrifice, discard: t.discard });
+  else beginPayment({ type: 'activate', id: t.id, index: t.index, targets: t.targets, x: t.x, discard: t.discard });
+}
+
+// ---------- マナの支払い ----------
+// 呪文（能力）を先に選ぶと「マナを支払ってください」になり、土地をクリックして払う。
+// 先に土地をタップしてマナを浮かせておけば、そのマナから払う。「自動で支払う」で残りを自動で払う
+function actionCost(action) {
+  if (action.type === 'cast') {
+    const info = Engine.castInfo(G, ME, action.id, { flashback: action.flashback, mode: action.mode, kicked: action.kicked });
+    return info.ok ? info.cost ?? '' : '';
+  }
+  return Engine.abilitiesOf(G, action.id)[action.index]?.cost.mana ?? '';
+}
+function beginPayment(action) {
+  const cost = actionCost(action);
+  const x = action.x ?? 0;
+  if (!cost || Engine.poolShortfall(G, ME, cost, x).done) return act(ME, action);
+  ui.paying = { action, cost, x, name: G.objects[action.id].card.name };
+  Sound.play('button');
+  render();
+}
+function payingLeft() {
+  return ui.paying ? Engine.poolShortfall(G, ME, ui.paying.cost, ui.paying.x) : null;
+}
+// 土地からマナを出したあと：払い終わったら唱える
+function continuePayment() {
+  if (!ui.paying) return;
+  if (!G || Engine.needs(G)?.player !== ME) { ui.paying = null; return; }
+  if (payingLeft().done) finishPayment();
+}
+function finishPayment() {
+  const { action } = ui.paying;
+  ui.paying = null;
+  act(ME, action);
+}
+function cancelPayment() {
+  if (!ui.paying) return;
+  ui.paying = null;
+  Sound.play('cancel');
+  tick();
+}
+
+// 戦場のもの（土地・マナ・クリーチャー）からマナを出す。色を選べるならメニューを出す（W キーを押していれば選ばない）
+function manaOptions(id) {
+  const out = [];
+  for (const a of Engine.activations(G, ME, id)) {
+    const ab = Engine.abilitiesOf(G, id)[a.index];
+    if (!a.ok || !(ab?.mana || ab?.manaLike)) continue;
+    const pain = ab.manaExtra?.length ? `（${abilityText(ab.text.replace(/^[^.]*\.\s*/, '')).replace(/\.$/, '')}）` : '';
+    const m = ab.mana;
+    if (m?.choices?.length > 1) for (const c of m.choices) out.push({ label: `{${c}} を出す${pain}`, colors: [c], pain: !!pain, action: { type: 'activate', id, index: a.index, color: c } });
+    else out.push({ label: `${m ? `${(m.fixed ?? m.choices ?? []).map((c) => `{${c}}`).join('')} を出す` : abilityText(ab.text)}${pain}`, colors: m?.fixed ?? m?.choices ?? [], pain: !!pain, action: { type: 'activate', id, index: a.index } });
+  }
+  return out;
+}
+function tapForMana(id, e) {
+  const opts = manaOptions(id);
+  if (!opts.length) {
+    const a = Engine.activations(G, ME, id).find((x) => x.mana);
+    return toast(a?.reason ?? (G.objects[id].tapped ? 'タップしています' : 'マナを出せません'));
+  }
+  const go = (o) => { act(ME, o.action); continuePayment(); };
+  if (opts.length === 1) return go(opts[0]);
+  if (ui.wHeld) {
+    // いま足りない色 → 痛みのないもの → 一番上
+    const need = payingLeft()?.colors ?? [];
+    return go(opts.find((o) => o.colors.some((c) => need.includes(c))) ?? opts.find((o) => !o.pain) ?? opts[0]);
+  }
+  showMenu(opts.map((o) => [o.label, () => go(o)]), e?.clientX ?? lastPoint.x, e?.clientY ?? lastPoint.y, G.objects[id]);
+}
+function undoMana() {
+  if (!G || !Engine.canUndoMana(G, ME)) return toast('元に戻せるマナのタップがありません');
+  act(ME, { type: 'undoMana' });
 }
 
 function pickTarget(target) {
@@ -478,13 +557,15 @@ function onPermanentClick(id, e) {
     return;
   }
   if (o.controller !== ME) return phone() ? showDetail(id) : null;
-  // マナ能力はクリックでは起動しない（呪文を唱えるときに自動で支払う。手で出すなら右クリック）
-  const isLand = o.def.types.includes('land');
-  const acts = Engine.activations(G, ME, id).filter((a) => !a.cycling && !(a.mana || a.ability?.manaLike));
-  if (isLand && !acts.length) return toast('マナは呪文を唱えるときに自動で支払われます（手でマナを出すときは右クリック）');
+  // クリックでマナを出す（土地・マナを出すクリーチャーなど）。ほかの能力もあればメニューから選ぶ
+  const isMana = (a) => { const ab = Engine.abilitiesOf(G, id)[a.index]; return !!(ab?.mana || ab?.manaLike); };
+  const all = Engine.activations(G, ME, id).filter((a) => !a.cycling);
+  const acts = all.filter((a) => !isMana(a));
+  const manaActs = all.filter(isMana);
+  if (manaActs.length && (!acts.some((a) => a.ok) || ui.paying)) return tapForMana(id, e);
   const usable = acts.filter((a) => a.ok);
   if (!acts.length) return phone() ? showDetail(id) : null;
-  if (usable.length === 1 && !phone()) return startActivate(id, usable[0].index);
+  if (usable.length === 1 && !manaActs.length && !phone()) return startActivate(id, usable[0].index);
   openCardMenu(id, e.clientX, e.clientY);
 }
 
@@ -496,10 +577,14 @@ function openCardMenu(id, x, y) {
     else items.push(['唱える', () => startCast(id)]);
   }
   if (o.zone === 'graveyard' && o.owner === ME && o.def.flashback) items.push([`フラッシュバック（${o.def.flashback}）`, () => { closeViewer(); startCast(id, { flashback: true }); }]);
+  if (o.zone === 'battlefield' && o.controller === ME) for (const m of manaOptions(id)) items.push([m.label, () => { act(ME, m.action); continuePayment(); }]);
   for (const a of Engine.activations(G, ME, id)) {
-    const label = a.cycling ? `サイクリング（${o.def.cycling}）` : a.mana ? `マナを出す：${abilityText(a.text)}` : `起動：${abilityText(a.text)}`;
+    const ab = Engine.abilitiesOf(G, id)[a.index];
+    if (ab?.mana || ab?.manaLike) { if (!a.ok) items.push([`マナを出す（${a.reason}）`, () => toast(a.reason)]); continue; }
+    const label = a.cycling ? `サイクリング（${o.def.cycling}）` : `起動：${abilityText(a.text)}`;
     items.push([a.ok ? label : `${label}（${a.reason}）`, a.ok ? () => startActivate(id, a.index) : () => toast(a.reason)]);
   }
+  if (Engine.canUndoMana(G, ME)) items.push(['元に戻す：マナのタップ（Ctrl+Z）', undoMana]);
   items.push(['詳しく見る', () => showDetail(id)]);
   showMenu(items, x, y, o);
 }
@@ -560,7 +645,8 @@ function render() {
   }));
   $('phase-current').textContent = G.turn ? `${Engine.STEP_NAMES[G.step]}` : 'マリガン';
   $('phase-current').dataset.phase = PHASE_ICON[G.step] ?? G.step;
-  const myPriority = n?.player === ME && n.type === 'priority' && !ui.targeting;
+  const myPriority = n?.player === ME && n.type === 'priority' && !ui.targeting && !ui.paying;
+  $('undo-mana').hidden = !Engine.canUndoMana(G, ME);
   $('next-phase').disabled = !myPriority;
   $('next-phase').textContent = passLabel();
   $('end-turn').disabled = !myPriority;
@@ -569,6 +655,7 @@ function render() {
   // プレイヤー
   $('my-player-name').textContent = me.name;
   $('opp-player-name').textContent = opp.name;
+  $('opp-player-name').title = duel?.cpuDeckName ? `CPUのデッキ：${duel.cpuDeckName}` : '';
   $('my-avatar').style.backgroundImage = avatarImage(duel.avatars?.[0] ?? '1');
   $('opp-avatar').style.backgroundImage = avatarImage(duel.avatars?.[1] ?? '2');
   $('life').textContent = me.life;
@@ -694,6 +781,7 @@ function passLabel() {
 function hintText(n) {
   if (G.winner != null) return G.winner === ME ? '勝利しました。' : '敗北しました。';
   if (ui.targeting) return '対象を選んでください（Esc で取り消し）。';
+  if (ui.paying) return `マナを支払ってください（残り ${payingLeft().text}）。土地をクリックしてマナを出すか、「自動で支払う」。`;
   if (!n) return '';
   if (n.player !== ME) return online() ? `${G.players[OPP].name}の操作を待っています…` : `${G.players[OPP].name}が考えています…`;
   switch (n.type) {
@@ -772,6 +860,7 @@ function cardEl(id, zone = 'battlefield') {
     if (ui.blockSel != null && o.attacking && Engine.canBlock(G, ui.blockSel, id)) el.classList.add('block-target');
     if (isCand({ obj: id })) el.classList.add('targetable');
     if (n?.player === ME && n.type === 'sacrifice' && n.pending.options.includes(id)) el.classList.add(ui.picks.has(id) ? 'picked' : 'selectable');
+    if (ui.paying && o.controller === ME && !o.tapped && manaOptions(id).length) el.classList.add('selectable');
     el.addEventListener('click', (e) => onPermanentClick(id, e));
   } else if (zone === 'hand') {
     const n = Engine.needs(G);
@@ -782,12 +871,19 @@ function cardEl(id, zone = 'battlefield') {
     el.addEventListener('click', () => (phone() && n?.type === 'priority' ? openCardMenu(id, 0, 0) : onHandClick(id)));
   } else {
     if (isCand({ grave: id })) el.classList.add('targetable');
+    if (viewerState?.search) el.classList.add(viewerState.search.has(id) ? (ui.picks.has(id) ? 'picked' : 'selectable') : 'dim');
     if (viewerState?.multi && ui.picks.has(id)) {
       el.classList.add('picked');
       badge('counter', String([...ui.picks].indexOf(id) + 1));
     }
     el.addEventListener('click', (e) => {
       if (isCand({ grave: id })) { closeViewer(); return pickTarget({ grave: id }); }
+      if (viewerState?.search) {
+        if (!viewerState.search.has(id)) return toast('このカードは持ってこられません');
+        ui.picks = new Set(ui.picks.has(id) ? [] : [id]);
+        Sound.play('button');
+        return render();
+      }
       if (viewerState?.choose) return chooseFromViewer(id);
       if (viewerState?.multi) { if (ui.picks.has(id)) ui.picks.delete(id); else ui.picks.add(id); Sound.play('button'); return render(); }
       if (o.owner === ME && o.def.flashback) openCardMenu(id, e.clientX, e.clientY);
@@ -853,6 +949,13 @@ function renderBanner(n) {
   const show = (...els) => { bar.hidden = false; bar.replaceChildren(...els); };
   bar.hidden = true;
   if (G.winner != null) return;
+  // マナの支払い
+  if (ui.paying) {
+    const left = payingLeft();
+    return show(span(`「${ui.paying.name}」：マナを支払ってください（残り ${left.text}）`),
+      span('光っている土地をクリック（W を押しながらクリックで色を自動で選ぶ・Ctrl+Z でタップを取り消し）', 'block-hint'),
+      button('自動で支払う', finishPayment, true), button('キャンセル', cancelPayment));
+  }
   // 対象の選択
   const cands = currentCands();
   if (ui.targeting || (n?.player === ME && n.type === 'triggerTarget')) {
@@ -959,9 +1062,18 @@ function renderBanner(n) {
       openViewer({ title, ids: p.options, hint, multi: true, onOk: okMulti });
       return show(span(`${title}：${ui.picks.size}枚選択`), button('一覧を開く', () => openViewer({ title, ids: p.options, hint, multi: true, onOk: okMulti })), button('決定', () => { closeViewer(); act(ME, { type: 'choose', ids: [...ui.picks] }); }, true));
     }
-    case 'search':
-      openViewer({ title: 'ライブラリーから選ぶ', ids: p.options, hint: 'カードをクリックして選ぶ', choose: true });
-      return show(span('ライブラリーから探すカードを選んでください'), button('一覧を開く', () => openViewer({ title: 'ライブラリーから選ぶ', ids: p.options, hint: 'カードをクリックして選ぶ', choose: true })));
+    case 'search': {
+      // ライブラリー全体を開き、持ってこられるカードをクリックして「決定」
+      const open = () => {
+        const lib = G.players[ME].library.filter((x) => !G.objects[x].hidden);
+        const ids = [...lib].sort((a, b) => Number(!p.options.includes(a)) - Number(!p.options.includes(b)) || G.objects[a].card.name.localeCompare(G.objects[b].card.name));
+        openViewer({ title: `ライブラリー（${p.reason}）`, ids, hint: '持ってくるカードをクリックして「決定」（暗いカードは選べません）', search: new Set(p.options),
+          onOk: () => { const pick = [...ui.picks][0]; if (pick == null) return toast('カードを選んでください'); closeViewer(); act(ME, { type: 'choose', ids: [pick] }); } });
+      };
+      if (!viewerState?.search) { ui.picks.clear(); open(); }
+      const skip = p.optional ? [button('見つけない', () => { closeViewer(); act(ME, { type: 'skip' }); })] : [];
+      return show(span('ライブラリーから探すカードを選んでください'), button('一覧を開く', open, true), ...skip);
+    }
     default:
       return;
   }
@@ -1085,12 +1197,12 @@ function showResultIfNew() {
 function openSetup() {
   const options = () => decks.map((d) => new Option(`${d.name}（${Object.values(d.cards).reduce((s, e) => s + e.qty, 0)}枚）`, d.id));
   $('setup-deck').replaceChildren(...options());
-  $('setup-cpu-deck').replaceChildren(...options());
+  $('setup-cpu-deck').replaceChildren(new Option('ランダム（旧枠モダンのカードで毎回組む）', 'random'), ...options());
   const requested = Number(new URLSearchParams(location.search).get('deck'));
   $('setup-deck').value = String(requested || duel?.deckId || decks[0]?.id || '');
   let cpuDeck = null;
   try { cpuDeck = JSON.parse(localStorage.getItem(CPU_DECK_KEY)); } catch {}
-  $('setup-cpu-deck').value = String(decks.some((d) => d.id === cpuDeck) ? cpuDeck : $('setup-deck').value);
+  $('setup-cpu-deck').value = decks.some((d) => d.id === cpuDeck) ? String(cpuDeck) : 'random';
   $('player-name').value = myName();
   $('setup-error').textContent = decks.length ? '' : 'デッキがありません。デッキ作成画面で作ってください。';
   if (duel?.mode) $('setup-form').elements.mode.value = duel.mode === 'guest' ? 'join' : duel.mode;
@@ -1137,12 +1249,70 @@ function updateMode() {
   for (const r of $('setup-form').elements.order) r.disabled = mode === 'join';
 }
 
-function startFromSetup(e) {
+// ---------- CPU のランダムなデッキ ----------
+// 旧枠モダンでリーガルなカード（data/oldframe-modern.json）のうち、自動で処理できるものから2色のデッキを組む
+// 土地24枚（基本土地）・クリーチャー20枚（マナ・コストの軽いものを多めに）・ほかの呪文16枚
+let cardPool = null;
+const COLOR_NAMES = { W: '白', U: '青', B: '黒', R: '赤', G: '緑' };
+const shuffled = (a) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+
+async function randomCpuDeck() {
+  cardPool ??= fetch('data/oldframe-modern.json?v=1').then((r) => r.json()).then((d) => d.cards).catch((err) => { cardPool = null; throw err; });
+  const pool = await cardPool;
+  const usable = (c) => {
+    try { const def = CardText.compile(c); return def.support === 'full' && !Engine.unsupported(def).length; } catch { return false; }
+  };
+  const colors = shuffled(Object.keys(COLOR_NAMES)).slice(0, 2);
+  const pips = (c) => (c.manaCost ?? '').match(/\{[^}]*\}/g) ?? [];
+  const fits = (c) => (c.colors ?? []).length > 0 && c.colors.every((x) => colors.includes(x))
+    && pips(c).every((p) => !/[WUBRG]/.test(p) || [...p.matchAll(/[WUBRG]/g)].some((m) => colors.includes(m[0])));
+  const spells = shuffled(pool.filter((c) => !/\bLand\b/.test(c.typeLine) && fits(c) && c.cmc <= 6 && usable(c)));
+  const cards = {};
+  let count = 0;
+  const add = (c, qty) => { cards[c.name] = { card: { ...c, displayName: c.name }, qty }; count += qty; return qty; };
+  const take = (list, want) => {
+    let got = 0;
+    for (const c of list) {
+      if (got >= want) break;
+      if (cards[c.name]) continue;
+      const max = /\bLegendary\b/.test(c.typeLine) ? 1 : 4;
+      got += add(c, Math.min(max, want - got, 2 + Math.floor(Math.random() * 3)));
+    }
+    return got;
+  };
+  const creatures = spells.filter((c) => /\bCreature\b/.test(c.typeLine));
+  const others = spells.filter((c) => !/\bCreature\b/.test(c.typeLine) && c.cmc <= 5);
+  // クリーチャー：マナ・コストごとの枚数（足りなければ他のコストで埋める）
+  let made = 0;
+  for (const [lo, hi, want] of [[1, 1, 4], [2, 2, 6], [3, 3, 5], [4, 4, 3], [5, 6, 2]]) made += take(creatures.filter((c) => c.cmc >= lo && c.cmc <= hi), want);
+  made += take(creatures, 20 - made);
+  take(others, 36 - count);
+  take(spells, 36 - count);
+  // 土地：色マナの記号の数に合わせて基本土地を分ける
+  const weight = Object.fromEntries(colors.map((k) => [k, 0]));
+  for (const { card, qty } of Object.values(cards)) for (const p of pips(card)) for (const m of p.matchAll(/[WUBRG]/g)) if (m[0] in weight) weight[m[0]] += qty;
+  const total = Object.values(weight).reduce((a, b) => a + b, 0) || 1;
+  const basicFor = (k) => pool.find((c) => /\bBasic\b/.test(c.typeLine) && !/Snow/.test(c.typeLine) && (c.produced ?? []).length === 1 && c.produced[0] === k);
+  const n0 = Math.min(20, Math.max(4, Math.round((24 * weight[colors[0]]) / total)));
+  add(basicFor(colors[0]), n0);
+  add(basicFor(colors[1]), 24 - n0);
+  return { id: 'random', name: `ランダム（${colors.map((k) => COLOR_NAMES[k]).join('・')}）`, format: 'oldframe-modern', cards };
+}
+
+async function startFromSetup(e) {
   e.preventDefault();
   const deck = decks.find((d) => d.id === Number($('setup-deck').value));
   const mode = $('setup-form').elements.mode.value;
   if (mode === 'host' || mode === 'join') return startOnline(mode, deck);
-  const cpuDeck = mode === 'cpu' ? decks.find((d) => d.id === Number($('setup-cpu-deck').value)) : deck;
+  let cpuDeck = deck;
+  if (mode === 'cpu' && $('setup-cpu-deck').value === 'random') {
+    try {
+      cpuDeck = await randomCpuDeck();
+    } catch {
+      $('setup-error').textContent = 'カードの一覧を読み込めませんでした。もう一度お試しください。';
+      return;
+    }
+  } else if (mode === 'cpu') cpuDeck = decks.find((d) => d.id === Number($('setup-cpu-deck').value));
   const size = (d) => (d ? Object.values(d.cards).reduce((s, x) => s + x.qty, 0) : 0);
   if (size(deck) < 7 || size(cpuDeck) < 7) { $('setup-error').textContent = 'デッキに7枚以上のカードが必要です。'; return; }
   const name = $('player-name').value.trim().slice(0, 16) || myName();
@@ -1157,13 +1327,14 @@ function startFromSetup(e) {
     players: [{ name, deck: deckFor(deck) }, { name: mode === 'cpu' ? 'CPU' : '練習相手', deck: deckFor(cpuDeck) }],
     first, life,
   });
-  duel = { G, mode, deckId: deck.id, cpuDeckId: cpuDeck.id, deckName: deck.name, avatars: [myAvatar(), String(1 + Math.floor(Math.random() * 18))] };
+  duel = { G, mode, deckId: deck.id, cpuDeckId: cpuDeck.id, cpuDeckName: mode === 'cpu' ? cpuDeck.name : null, deckName: deck.name, avatars: [myAvatar(), String(1 + Math.floor(Math.random() * 18))] };
   ui.autoTurn = null;
   ui.targeting = null;
   shownResult = null;
   $('setup').close();
   save();
   tick();
+  if (duel.cpuDeckName) toast(`CPUのデッキ：${duel.cpuDeckName}`);
 }
 
 function init() {
@@ -1195,14 +1366,19 @@ function init() {
   $('result-again').addEventListener('click', () => { $('result').close(); openSetup(); });
   document.addEventListener('click', (e) => { if (!$('menu').contains(e.target) && !e.target.closest('[data-longpress]')) hideMenu(); }, true);
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { cancelTargeting(); hideMenu(); return; }
+    if (e.key === 'Escape') { cancelTargeting(); cancelPayment(); hideMenu(); return; }
     if (document.querySelector('dialog[open]') || e.target.matches('input, select, textarea')) return;
+    if (e.key.toLowerCase() === 'w') ui.wHeld = true;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoMana(); return; }
     const n = G && Engine.needs(G);
     if (n?.player !== ME || n.type !== 'priority' || ui.targeting) return;
     if (e.key === ' ') { e.preventDefault(); act(ME, { type: 'pass' }); }
     else if (e.key === 'Enter') { e.preventDefault(); ui.autoTurn = G.turn; act(ME, { type: 'pass' }); }
   });
   window.addEventListener('phonesheet', () => { hideMenu(); if (G) renderLog(); });
+  document.addEventListener('keyup', (e) => { if (e.key.toLowerCase() === 'w') ui.wHeld = false; });
+  window.addEventListener('blur', () => { ui.wHeld = false; });
+  $('undo-mana').addEventListener('click', undoMana);
   placePhases();
   window.addEventListener('resize', placePhases);
   const requested = Number(new URLSearchParams(location.search).get('deck'));

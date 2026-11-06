@@ -315,3 +315,8 @@ html:not(.phone) body.duel .status-line { flex-wrap: wrap; row-gap: 2px; }
 html:not(.phone) body.duel .preview-frame .preview { height: 100%; width: auto; object-fit: contain; }
 html:not(.phone) body.duel .preview-frame { padding: 4px; }
 html:not(.phone) body.duel .preview-frame { align-self: stretch; height: auto; }
+
+/* ライブラリーから探す：持ってこられないカードは暗く */
+.card.dim { opacity: .35; filter: grayscale(.7); cursor: not-allowed; }
+/* マナの支払い中：マナを出せる土地を光らせる */
+.bf-row .card.selectable { outline: 2px solid #e8c66a; outline-offset: 2px; box-shadow: 0 0 10px rgba(232, 198, 106, .6); }
