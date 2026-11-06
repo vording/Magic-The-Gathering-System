@@ -409,12 +409,14 @@ const Engine = (() => {
       if (o.tapped) continue;
       if (isType(o, 'creature') && isSick(G, id)) continue;
       abilitiesOf(G, id).forEach((a, i) => {
-        if (!a.mana || !a.cost.tap || a.cost.mana || a.cost.sacSelf || a.cost.life || a.cost.discard || a.cost.sacType) return;
+        if (!a.mana || !a.cost.tap || a.cost.mana || a.cost.sacSelf || a.cost.life || a.cost.discard || a.cost.sacType || a.cost.removeCounter) return;
         const m = manaNow(G, id, a.mana);
         if (!m) return;
-        out.push({ id, index: i, choices: m.fixed ?? m.choices, amount: m.amount, fixed: !!m.fixed, land: isType(o, 'land') });
+        out.push({ id, index: i, choices: m.fixed ?? m.choices, amount: m.amount, fixed: !!m.fixed, land: isType(o, 'land'), extra: a.manaExtra ?? null });
       });
     }
+    // ペインランド：痛みのない能力で出せる色（不特定マナや無色はそちらで払う）
+    for (const s of out) if (s.extra) s.painless = [...new Set(out.filter((t) => t.id === s.id && !t.extra).flatMap((t) => t.choices))];
     // 1つのものに複数のマナ能力があっても、使えるのは1つ（どれもタップするため）
     const seen = new Map();
     for (const s of out) {
@@ -504,7 +506,7 @@ const Engine = (() => {
     let need = generic;
     for (const i of order) {
       if (!need) break;
-      used[i] = units[i].colors[0];
+      used[i] = units[i].src?.painless?.[0] ?? units[i].colors[0];
       if (units[i].src) tappedSrc.add(units[i].src.id);
       need--;
     }
@@ -516,7 +518,7 @@ const Engine = (() => {
     if (u.pool) return 0;
     if (tapped.has(u.src.id)) return 1;
     const need = Math.min(...u.src.choices.map((c) => demand[c] ?? 0));
-    return 2 + need * 2 + (u.src.land ? 0 : 1) + u.src.choices.length / 10;
+    return 2 + need * 2 + (u.src.land ? 0 : 1) + u.src.choices.length / 10 + (u.src.extra ? 1.5 : 0);
   };
   // 手札の呪文と、戦場のもののマナ能力以外の起動コストに出てくる色の数
   function colorDemand(G, p, exclude) {
@@ -546,6 +548,8 @@ const Engine = (() => {
     for (const { src, spent, colors } of tapped.values()) {
       obj(G, src.id).tapped = true;
       onTapped(G, src.id, true);
+      // ペインランドの色マナを使ったら、ダメージなどの効果も起こる
+      if (src.extra && !(src.painless?.length && colors.every((c) => src.painless.includes(c)))) manaExtraEffects(G, p, src.id, src.extra);
       // 出たマナのうち、使わなかった分
       const produced = src.fixed ? [...src.choices] : Array(src.amount).fill(colors[0] ?? src.choices[0]);
       for (const c of colors) { const k = produced.indexOf(c); if (k >= 0) produced.splice(k, 1); else produced.pop(); }
@@ -1580,6 +1584,7 @@ const Engine = (() => {
     // マナ能力はスタックを使わない
     if (a.mana) {
       addMana(G, p, manaNow(G, id, a.mana) ?? a.mana, color);
+      if (a.manaExtra?.length) manaExtraEffects(G, p, id, a.manaExtra);
       return;
     }
     if (a.manaLike) {
@@ -1591,6 +1596,13 @@ const Engine = (() => {
     G.stack.push({ sid: G.nextSid++, kind: 'ability', controller: p, source: id, name: lki.name, text: a.text, effects: a.effects, targets, x, colors: lki.colors, sacPower });
     log(G, p, `${lki.name}の能力を起動${targetText(G, targets)}`);
     if (a.cycling) queueTrigger(G, id, 'cycled');
+  }
+
+  // マナ能力に付いた、対象を取らない効果（「このランドはあなたに1点のダメージを与える」など）
+  function manaExtraEffects(G, p, id, effects) {
+    const o = obj(G, id);
+    const item = { controller: p, source: id, name: o.card.name, effects, targets: [], x: 0, colors: o.def.colors };
+    for (const f of effects) resolveEffect(G, item, f, null);
   }
 
   function addMana(G, p, m, color = null) {

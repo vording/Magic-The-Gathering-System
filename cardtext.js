@@ -901,10 +901,17 @@ const CardText = (() => {
     }
     const fx = effects(body, def);
     if (!fx || !fx.length) return 'manual';
-    const mana = fx.length === 1 && fx[0].type === 'addMana' && !fx[0].amount ? fx[0].mana : null;
+    let mana = fx.length === 1 && fx[0].type === 'addMana' && !fx[0].amount ? fx[0].mana : null;
+    // 「{T}: Add {W} or {U}. This land deals 1 damage to you.」（ペインランドなど）：対象を取らないので、これもマナ能力（スタックを使わない）
+    let manaExtra = null;
+    const adds = fx.filter((f) => f.type === 'addMana');
+    if (!mana && adds.length === 1 && !adds[0].amount && fx.every((f) => f.type === 'addMana' || !f.target)) {
+      mana = adds[0].mana;
+      manaExtra = fx.filter((f) => f.type !== 'addMana');
+    }
     // 「数だけマナを出す」もマナ能力（スタックを使わない）。自動の支払いには使わない
     const manaLike = !mana && fx.every((f) => f.type === 'addMana');
-    return { cost, effects: fx, mana, manaLike, sorcery, once, limit: twice ? 2 : null, upkeep, combat, endcombat, yourTurn, ifGrave, text: line, fromHand: cost.discardSelf };
+    return { cost, effects: fx, mana, manaExtra, manaLike, sorcery, once, limit: twice ? 2 : null, upkeep, combat, endcombat, yourTurn, ifGrave, text: line, fromHand: cost.discardSelf };
   }
 
   // ---------- カード全体 ----------
