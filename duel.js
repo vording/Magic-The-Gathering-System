@@ -569,6 +569,7 @@ function render() {
   // プレイヤー
   $('my-player-name').textContent = me.name;
   $('opp-player-name').textContent = opp.name;
+  $('opp-player-name').title = duel?.cpuDeckName ? `CPUのデッキ：${duel.cpuDeckName}` : '';
   $('my-avatar').style.backgroundImage = avatarImage(duel.avatars?.[0] ?? '1');
   $('opp-avatar').style.backgroundImage = avatarImage(duel.avatars?.[1] ?? '2');
   $('life').textContent = me.life;
@@ -1085,12 +1086,12 @@ function showResultIfNew() {
 function openSetup() {
   const options = () => decks.map((d) => new Option(`${d.name}（${Object.values(d.cards).reduce((s, e) => s + e.qty, 0)}枚）`, d.id));
   $('setup-deck').replaceChildren(...options());
-  $('setup-cpu-deck').replaceChildren(...options());
+  $('setup-cpu-deck').replaceChildren(new Option('ランダム（旧枠モダンのカードで毎回組む）', 'random'), ...options());
   const requested = Number(new URLSearchParams(location.search).get('deck'));
   $('setup-deck').value = String(requested || duel?.deckId || decks[0]?.id || '');
   let cpuDeck = null;
   try { cpuDeck = JSON.parse(localStorage.getItem(CPU_DECK_KEY)); } catch {}
-  $('setup-cpu-deck').value = String(decks.some((d) => d.id === cpuDeck) ? cpuDeck : $('setup-deck').value);
+  $('setup-cpu-deck').value = decks.some((d) => d.id === cpuDeck) ? String(cpuDeck) : 'random';
   $('player-name').value = myName();
   $('setup-error').textContent = decks.length ? '' : 'デッキがありません。デッキ作成画面で作ってください。';
   if (duel?.mode) $('setup-form').elements.mode.value = duel.mode === 'guest' ? 'join' : duel.mode;
@@ -1137,12 +1138,70 @@ function updateMode() {
   for (const r of $('setup-form').elements.order) r.disabled = mode === 'join';
 }
 
-function startFromSetup(e) {
+// ---------- CPU のランダムなデッキ ----------
+// 旧枠モダンでリーガルなカード（data/oldframe-modern.json）のうち、自動で処理できるものから2色のデッキを組む
+// 土地24枚（基本土地）・クリーチャー20枚（マナ・コストの軽いものを多めに）・ほかの呪文16枚
+let cardPool = null;
+const COLOR_NAMES = { W: '白', U: '青', B: '黒', R: '赤', G: '緑' };
+const shuffled = (a) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+
+async function randomCpuDeck() {
+  cardPool ??= fetch('data/oldframe-modern.json?v=1').then((r) => r.json()).then((d) => d.cards).catch((err) => { cardPool = null; throw err; });
+  const pool = await cardPool;
+  const usable = (c) => {
+    try { const def = CardText.compile(c); return def.support === 'full' && !Engine.unsupported(def).length; } catch { return false; }
+  };
+  const colors = shuffled(Object.keys(COLOR_NAMES)).slice(0, 2);
+  const pips = (c) => (c.manaCost ?? '').match(/\{[^}]*\}/g) ?? [];
+  const fits = (c) => (c.colors ?? []).length > 0 && c.colors.every((x) => colors.includes(x))
+    && pips(c).every((p) => !/[WUBRG]/.test(p) || [...p.matchAll(/[WUBRG]/g)].some((m) => colors.includes(m[0])));
+  const spells = shuffled(pool.filter((c) => !/\bLand\b/.test(c.typeLine) && fits(c) && c.cmc <= 6 && usable(c)));
+  const cards = {};
+  let count = 0;
+  const add = (c, qty) => { cards[c.name] = { card: { ...c, displayName: c.name }, qty }; count += qty; return qty; };
+  const take = (list, want) => {
+    let got = 0;
+    for (const c of list) {
+      if (got >= want) break;
+      if (cards[c.name]) continue;
+      const max = /\bLegendary\b/.test(c.typeLine) ? 1 : 4;
+      got += add(c, Math.min(max, want - got, 2 + Math.floor(Math.random() * 3)));
+    }
+    return got;
+  };
+  const creatures = spells.filter((c) => /\bCreature\b/.test(c.typeLine));
+  const others = spells.filter((c) => !/\bCreature\b/.test(c.typeLine) && c.cmc <= 5);
+  // クリーチャー：マナ・コストごとの枚数（足りなければ他のコストで埋める）
+  let made = 0;
+  for (const [lo, hi, want] of [[1, 1, 4], [2, 2, 6], [3, 3, 5], [4, 4, 3], [5, 6, 2]]) made += take(creatures.filter((c) => c.cmc >= lo && c.cmc <= hi), want);
+  made += take(creatures, 20 - made);
+  take(others, 36 - count);
+  take(spells, 36 - count);
+  // 土地：色マナの記号の数に合わせて基本土地を分ける
+  const weight = Object.fromEntries(colors.map((k) => [k, 0]));
+  for (const { card, qty } of Object.values(cards)) for (const p of pips(card)) for (const m of p.matchAll(/[WUBRG]/g)) if (m[0] in weight) weight[m[0]] += qty;
+  const total = Object.values(weight).reduce((a, b) => a + b, 0) || 1;
+  const basicFor = (k) => pool.find((c) => /\bBasic\b/.test(c.typeLine) && !/Snow/.test(c.typeLine) && (c.produced ?? []).length === 1 && c.produced[0] === k);
+  const n0 = Math.min(20, Math.max(4, Math.round((24 * weight[colors[0]]) / total)));
+  add(basicFor(colors[0]), n0);
+  add(basicFor(colors[1]), 24 - n0);
+  return { id: 'random', name: `ランダム（${colors.map((k) => COLOR_NAMES[k]).join('・')}）`, format: 'oldframe-modern', cards };
+}
+
+async function startFromSetup(e) {
   e.preventDefault();
   const deck = decks.find((d) => d.id === Number($('setup-deck').value));
   const mode = $('setup-form').elements.mode.value;
   if (mode === 'host' || mode === 'join') return startOnline(mode, deck);
-  const cpuDeck = mode === 'cpu' ? decks.find((d) => d.id === Number($('setup-cpu-deck').value)) : deck;
+  let cpuDeck = deck;
+  if (mode === 'cpu' && $('setup-cpu-deck').value === 'random') {
+    try {
+      cpuDeck = await randomCpuDeck();
+    } catch {
+      $('setup-error').textContent = 'カードの一覧を読み込めませんでした。もう一度お試しください。';
+      return;
+    }
+  } else if (mode === 'cpu') cpuDeck = decks.find((d) => d.id === Number($('setup-cpu-deck').value));
   const size = (d) => (d ? Object.values(d.cards).reduce((s, x) => s + x.qty, 0) : 0);
   if (size(deck) < 7 || size(cpuDeck) < 7) { $('setup-error').textContent = 'デッキに7枚以上のカードが必要です。'; return; }
   const name = $('player-name').value.trim().slice(0, 16) || myName();
@@ -1157,13 +1216,14 @@ function startFromSetup(e) {
     players: [{ name, deck: deckFor(deck) }, { name: mode === 'cpu' ? 'CPU' : '練習相手', deck: deckFor(cpuDeck) }],
     first, life,
   });
-  duel = { G, mode, deckId: deck.id, cpuDeckId: cpuDeck.id, deckName: deck.name, avatars: [myAvatar(), String(1 + Math.floor(Math.random() * 18))] };
+  duel = { G, mode, deckId: deck.id, cpuDeckId: cpuDeck.id, cpuDeckName: mode === 'cpu' ? cpuDeck.name : null, deckName: deck.name, avatars: [myAvatar(), String(1 + Math.floor(Math.random() * 18))] };
   ui.autoTurn = null;
   ui.targeting = null;
   shownResult = null;
   $('setup').close();
   save();
   tick();
+  if (duel.cpuDeckName) toast(`CPUのデッキ：${duel.cpuDeckName}`);
 }
 
 function init() {

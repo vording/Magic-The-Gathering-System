@@ -55,6 +55,7 @@
     '絞り込み': 'Filters', '絞り込みをリセット': 'Reset all filters', '色': 'Color', 'タイプ': 'Type', 'マナ総量': 'Mana value', 'レアリティ': 'Rarity',
     'すべて': 'All', '7以上': '7+', 'コモン': 'Common', 'アンコモン': 'Uncommon', 'レア': 'Rare', '神話レア': 'Mythic',
     '無色': 'Colorless', '多色': 'Multicolor',
+    'ランダム（旧枠モダンのカードで毎回組む）': 'Random (built from Old-Frame Modern cards each game)', 'カードの一覧を読み込めませんでした。もう一度お試しください。': 'Could not load the card list. Please try again.',
     'カード一覧': 'Cards', '並び順': 'Sort', '発売日': 'Release date', '人気': 'Popularity', 'デッキ一覧': 'Decks & Lists',
     'ルール対戦 ▶': 'Rules match ▶',
     'カード検索 ': 'Card Search ', 'デッキ（': 'Deck (', '枚）': ' cards)', '枚': 'cards',
@@ -245,6 +246,8 @@
     // ルール対戦（追加の処理）
     [/^使えるマナ (\d+)$/, (_, n) => `Mana available ${n}`],
     [/^(\d+)枚タップ$/, (_, n) => `taps ${n}`],
+    [/^ランダム（([白青黒赤緑])・([白青黒赤緑])）$/, (_, a, b) => `Random (${T(a)}/${T(b)})`],
+    [/^CPUのデッキ：(.+)$/, (_, d) => `CPU deck: ${T(d)}`],
     [/^(.+)・(\d+)枚$/, (_, f, n) => `${T(f)} · ${n} cards`],
     [/^(.+)(が唱えた|の誘発型能力|が能力を起動)$/, (_, w, v) => `${T(w)} ${v === 'が唱えた' ? 'cast' : v === 'の誘発型能力' ? "— triggered ability" : 'activated an ability'}`],
     [/^対象：(.+)$/, (_, l) => `Target: ${list(l)}`],
