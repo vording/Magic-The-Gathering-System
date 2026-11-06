@@ -128,6 +128,42 @@ const tests = {
     ok(Engine.perform(J, 0, { type: 'cast', id: id(J, 'Twin Insight') }));
     assert.equal(J.players[0].life, 19);
   },
+  'mana undo: tapping a land for mana can be undone until something else happens'() {
+    const wastes = C('Adarkar Wastes', 'Land', '', '{T}: Add {C}.\n{T}: Add {W} or {U}. Adarkar Wastes deals 1 damage to you.');
+    const G = setup({ p0: { hand: [K.counterspell, K.bears], bf: [L.Island, wastes, L.Forest] } });
+    const isl = id(G, 'Island');
+    ok(Engine.perform(G, 0, { type: 'activate', id: isl, index: 0 }));
+    ok(Engine.perform(G, 0, { type: 'activate', id: id(G, 'Adarkar Wastes'), index: 1, color: 'U' }));
+    assert.equal(G.players[0].pool.U, 2);
+    assert.equal(G.players[0].life, 19);
+    assert.ok(Engine.canUndoMana(G, 0));
+    assert.ok(!Engine.canUndoMana(G, 1));
+    ok(Engine.perform(G, 0, { type: 'undoMana' }));
+    assert.equal(G.players[0].pool.U, 1);
+    assert.equal(G.players[0].life, 20);
+    assert.equal(G.objects[id(G, 'Adarkar Wastes')].tapped, false);
+    ok(Engine.perform(G, 0, { type: 'undoMana' }));
+    assert.equal(G.players[0].pool.U, 0);
+    assert.equal(G.objects[isl].tapped, false);
+    assert.ok(!Engine.perform(G, 0, { type: 'undoMana' }).ok);
+    // 呪文を唱えたら巻き戻せない
+    ok(Engine.perform(G, 0, { type: 'activate', id: id(G, 'Forest'), index: 0 }));
+    ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Grizzly Bears') }));
+    assert.ok(!Engine.canUndoMana(G, 0));
+  },
+  'pool shortfall: what is still owed after the floating mana'() {
+    const G = setup({ p0: { bf: [L.Island] } });
+    let r = Engine.poolShortfall(G, 0, '{1}{U}{U}');
+    assert.equal(r.text, '{1}{U}{U}');
+    G.players[0].pool.U = 1;
+    G.players[0].pool.R = 1;
+    r = Engine.poolShortfall(G, 0, '{1}{U}{U}');
+    assert.equal(r.text, '{U}');
+    assert.deepEqual(r.colors, ['U']);
+    G.players[0].pool.U = 2;
+    assert.ok(Engine.poolShortfall(G, 0, '{1}{U}{U}').done);
+    assert.equal(Engine.poolShortfall(G, 0, '{X}{R}', 3).text, '{1}');
+  },
   'bolt to face resolves after both pass'() {
     const G = setup({ p0: { hand: [K.bolt], bf: [L.Mountain] } });
     ok(Engine.perform(G, 0, { type: 'cast', id: id(G, 'Lightning Bolt'), targets: [{ player: 1 }] }));

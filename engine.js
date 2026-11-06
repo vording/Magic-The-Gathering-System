@@ -2122,13 +2122,67 @@ const Engine = (() => {
 
   function perform(G, p, action) {
     try {
+      if (action.type === 'undoMana') { undoMana(G, p); return { ok: true }; }
+      const rec = manaUndoRecord(G, p, action);
       doAction(G, p, action);
       run(G);
+      // 手で出したマナは、スタックに何かが乗る前なら巻き戻せる（それ以外の行動をしたら巻き戻せない）
+      if (rec && G.stack.length === rec.stackLen && !G.pending && G.winner == null && !(G.choices?.length)) (G.manaUndo ??= []).push(rec);
+      else G.manaUndo = null;
       return { ok: true };
     } catch (e) {
       if (e instanceof RuleError) return { ok: false, error: e.message };
       throw e;
     }
+  }
+
+  // ---------- マナのタップの巻き戻し（Ctrl+Z） ----------
+  // 巻き戻せるのは、タップしてマナを出すだけの能力（生け贄・カウンター・カードを引くなどがないもの。ペインランドのダメージは戻す）
+  function manaUndoRecord(G, p, a) {
+    if (a.type !== 'activate') return null;
+    const ab = abilitiesOf(G, a.id)[a.index];
+    if (!ab || !(ab.mana || ab.manaLike)) return null;
+    const c = ab.cost;
+    if (c.sacSelf || c.sacType || c.discard || c.discardSelf || c.removeCounter || c.life || c.exileSelfFromGrave) return null;
+    if (!(ab.manaExtra ?? []).every((f) => f.type === 'loseSelf')) return null;
+    const o = obj(G, a.id);
+    const pl = G.players[p];
+    return {
+      p, id: a.id, tapped: !!o.tapped, pool: { ...pl.pool }, life: pl.life, stackLen: G.stack.length,
+      used: JSON.stringify(o.used ?? {}), usedCount: JSON.stringify(o.usedCount ?? {}),
+    };
+  }
+  const canUndoMana = (G, p) => !!G.manaUndo?.length && G.manaUndo.at(-1).p === p;
+  function undoMana(G, p) {
+    if (!canUndoMana(G, p)) fail('元に戻せるマナのタップがありません');
+    const r = G.manaUndo.pop();
+    const o = obj(G, r.id);
+    const pl = G.players[p];
+    if (o && onBf(G, r.id)) {
+      o.tapped = r.tapped;
+      o.used = JSON.parse(r.used);
+      o.usedCount = JSON.parse(r.usedCount);
+    }
+    Object.assign(pl.pool, r.pool);
+    if (pl.life !== r.life) setLife(G, p, r.life);
+    log(G, p, `${o?.card.name ?? ''}のタップを取り消した`);
+    sfx(G, 'tap');
+  }
+
+  // プールのマナで払ったあとに足りない分 → { done, text: '{1}{U}' の形, colors: 足りない色 }
+  function poolShortfall(G, p, costStr, x = 0) {
+    const cost = R().parseCost(costStr ?? '', 0);
+    const pool = { ...G.players[p].pool };
+    const left = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+    for (const k of Object.keys(left)) for (let i = 0; i < cost[k]; i++) { if (pool[k] > 0) pool[k]--; else left[k]++; }
+    const hybrid = [];
+    for (const h of cost.hybrid) { const k = h.find((c) => pool[c] > 0); if (k) pool[k]--; else hybrid.push(h); }
+    let generic = cost.generic + cost.x * x;
+    const rest = Object.values(pool).reduce((a, b) => a + b, 0);
+    generic -= Math.min(generic, rest);
+    const text = `${generic ? `{${generic}}` : ''}${hybrid.map((h) => `{${h.join('/')}}`).join('')}${Object.entries(left).map(([k, n]) => `{${k}}`.repeat(n)).join('')}`;
+    const colors = [...Object.entries(left).filter(([, n]) => n).map(([k]) => k), ...hybrid.flat()];
+    return { done: !text, text, colors, generic };
   }
 
   function doAction(G, p, a) {
@@ -2476,6 +2530,8 @@ const Engine = (() => {
     };
     // ライブラリーから探している最中のカードは、探しているプレイヤーには見せる
     const shown = new Set(G.pending?.player === p && ['search', 'chooseHand', 'scry', 'lookPick', 'reorder'].includes(G.pending.type) ? G.pending.options : []);
+    // 探しているプレイヤーには、ライブラリー全体を見せる
+    if (G.pending?.player === p && G.pending.type === 'search') for (const id of G.players[p].library) shown.add(id);
     // 公開したカード（束に分ける・束を選ぶ）は両方のプレイヤーに見える
     if (G.pending?.type === 'separate') for (const id of G.pending.options) shown.add(id);
     if (G.pending?.type === 'choosePile') for (const id of G.pending.piles.flat()) shown.add(id);
@@ -2518,7 +2574,7 @@ const Engine = (() => {
   return {
     SUPPORTED, unsupported, countOf, abilitiesOf,
     STEPS, STEP_NAMES, create, perform, needs, run,
-    ch, cv, isSick, canAttack, canBlock, castInfo, activations, targetsFor, hasPlayable, planPayment, canPay, manaSources, maxX,
+    ch, cv, isSick, canAttack, canBlock, castInfo, activations, targetsFor, hasPlayable, planPayment, canPay, manaSources, maxX, canUndoMana, poolShortfall,
     sorceryTiming, isType: (G, id, t) => isType(obj(G, id), t), view, specOf, spellSpecs,
   };
 })();
