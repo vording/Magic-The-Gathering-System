@@ -335,3 +335,13 @@ html.phone .banner:not(.big) {
 }
 html.phone .banner:not(.big) .block-hint { display: none; }
 html.phone .banner:not(.big) button { min-height: 30px; padding: 2px 10px; }
+
+/* PC も：案内（支払い・攻撃・ブロック・対象）は戦場に重ねず、相手と自分の戦場の間に挟む（カードを押せるように） */
+html:not(.phone) body.duel .banner:not(.big) {
+  position: static;
+  transform: none;
+  width: auto;
+  max-width: none;
+  margin: 2px 8px;
+  flex: none;
+}

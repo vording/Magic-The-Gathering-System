@@ -1099,6 +1099,9 @@ function init() {
   $('deck-play').addEventListener('click', () => {
     location.href = `play.html?deck=${activeDeck().id}`;
   });
+  $('deck-phase').addEventListener('click', () => {
+    location.href = `phase.html?deck=${activeDeck().id}`;
+  });
   $('deck-duel').addEventListener('click', () => {
     location.href = `duel.html?deck=${activeDeck().id}`;
   });
