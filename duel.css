@@ -320,3 +320,18 @@ html:not(.phone) body.duel .preview-frame { align-self: stretch; height: auto; }
 .card.dim { opacity: .35; filter: grayscale(.7); cursor: not-allowed; }
 /* マナの支払い中：マナを出せる土地を光らせる */
 .bf-row .card.selectable { outline: 2px solid #e8c66a; outline-offset: 2px; box-shadow: 0 0 10px rgba(232, 198, 106, .6); }
+
+/* スマホ：案内（支払い・対象の選択など）は戦場に重ねず、相手と自分の戦場の間に挟む（土地やカードを押せるように） */
+html.phone .banner:not(.big) {
+  position: static;
+  transform: none;
+  width: auto;
+  max-width: none;
+  margin: 2px 4px;
+  padding: 4px 8px;
+  gap: 4px 6px;
+  font-size: 12px;
+  flex: none;
+}
+html.phone .banner:not(.big) .block-hint { display: none; }
+html.phone .banner:not(.big) button { min-height: 30px; padding: 2px 10px; }
