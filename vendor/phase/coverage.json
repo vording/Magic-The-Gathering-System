@@ -1,0 +1,92 @@
+{
+"supported": 987,
+"total": 1014,
+"unsupported": {
+"Flame Wave": [
+"Effect:unparsed_verb_arguments"
+],
+"Sacred Ground": [
+"Trigger:Whenever a spell or ability an opponent controls causes a land to be put into your graveyard from the battlefield"
+],
+"Scalpelexis": [
+"Effect:unrecognized_clause_head"
+],
+"Blackmail": [
+"Effect:unparsed_verb_arguments"
+],
+"Crypt Rats": [
+"Effect:unparsed_verb_arguments"
+],
+"Grinning Totem": [
+"Effect:delayed_unplayed_exile_sweep"
+],
+"Patriarch's Bidding": [
+"Effect:unparsed_verb_arguments"
+],
+"Mana Clash": [
+"Effect:per_object_coin_flip_outcome",
+"Effect:unrecognized_clause_head"
+],
+"Urza's Mine": [
+"Swallow:Replacement_Instead"
+],
+"Urza's Tower": [
+"Swallow:Replacement_Instead"
+],
+"Honorable Passage": [
+"Swallow:Condition_If"
+],
+"Teferi's Moat": [
+"Effect:static_structure"
+],
+"Leviathan": [
+"Static:Unrecognized(unless you sacrifice two Islands)"
+],
+"Void": [
+"Swallow:DynamicQty"
+],
+"Plagiarize": [
+"Effect:unparsed_replacement"
+],
+"Imaginary Pet": [
+"Effect:unparsed_condition"
+],
+"Final Punishment": [
+"Effect:unparsed_quantity"
+],
+"Okk": [
+"Static:Unrecognized(unless a creature with greater power also attacks)",
+"Static:Unrecognized(unless a creature with greater power also blocks)"
+],
+"Kjeldoran Royal Guard": [
+"Effect:unparsed_replacement"
+],
+"Oracle's Attendants": [
+"Effect:unparsed_replacement"
+],
+"Thieves' Auction": [
+"Effect:unparsed_verb_arguments",
+"Effect:unrecognized_clause_head"
+],
+"Sutured Ghoul": [
+"Effect:unknown"
+],
+"Booby Trap": [
+"Effect:unknown",
+"Trigger:When the chosen player draws a card with the chosen name"
+],
+"Mishra's Factory": [
+"ParserMisfire:InvalidSubtype(Assembly-Worker)"
+],
+"Urza's Power Plant": [
+"Swallow:Replacement_Instead"
+],
+"Celestial Dawn": [
+"Effect:effect_structure",
+"Effect:static_structure"
+],
+"Vexing Arcanix": [
+"Effect:otherwise"
+]
+}
+}

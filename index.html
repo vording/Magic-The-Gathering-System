@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="theme.css?v=28">
   <link rel="stylesheet" href="style.css?v=11">
   <link rel="stylesheet" href="metal.css?v=1">
-  <script src="i18n.js?v=26"></script>
+  <script src="i18n.js?v=27"></script>
   <script src="device.js?v=1"></script>
   <script src="zoom.js?v=2"></script>
 </head>
@@ -22,6 +22,7 @@
         <span class="active">デッキ作成</span>
         <a href="play.html">一人回し・対戦</a>
         <a href="duel.html">ルール対戦</a>
+        <a href="phase.html">ルール対戦（phase.rs）</a>
       </nav>
       <span class="spacer"></span>
       <span class="lang-picker"></span>
@@ -165,6 +166,7 @@
           <div id="curve" class="curve well"></div>
           <button id="deck-play" class="primary play-btn">一人回し ▶</button>
           <button id="deck-duel" class="primary play-btn" title="ルールどおりに自動で進む対戦（CPU・練習相手）">ルール対戦 ▶</button>
+          <button id="deck-phase" class="primary play-btn" title="ルールエンジンに phase.rs を使う対戦（CPU。旧枠モダンのカード）">ルール対戦（phase.rs）▶</button>
         </div>
       </aside>
     </main>
@@ -221,6 +223,6 @@
     </form>
   </dialog>
 
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>

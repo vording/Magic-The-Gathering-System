@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ルール対戦（phase.rs）— Magic: The Gathering System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="theme.css?v=28">
+  <link rel="stylesheet" href="play.css?v=45">
+  <link rel="stylesheet" href="duel.css?v=9">
+  <link rel="stylesheet" href="metal.css?v=1">
+  <script src="i18n.js?v=27"></script>
+  <script src="device.js?v=1"></script>
+  <script src="felt.js?v=7"></script>
+  <script src="zoom.js?v=2"></script>
+</head>
+<body class="online duel phase">
+  <div class="app">
+    <header class="topbar">
+      <h1 class="logo"><img class="logo-img" src="img/logo.png" alt="Magic: The Gathering"><small>System</small></h1>
+      <span class="game-title"><span id="deck-name"></span></span>
+      <span id="net-status" class="net-status">phase.rs</span>
+      <span class="spacer"></span>
+      <span class="lang-picker"></span>
+      <span id="felt-picker" class="felt-picker"></span>
+      <button id="restart">リスタート</button>
+    </header>
+
+    <main class="table">
+      <aside class="col-left" id="col-left">
+        <div class="card-frame preview-frame">
+          <img id="preview" class="preview" alt="" hidden>
+          <div id="preview-text" class="preview-text" hidden></div>
+        </div>
+        <div class="status-box">
+          <div class="status-line">
+            <span id="turn-label" class="turn-label"></span>
+            <span id="land-count" class="land-count" title="このターンにプレイした土地の数"></span>
+          </div>
+          <p id="phase-hint" class="phase-hint"></p>
+        </div>
+        <nav id="phases" class="phases"></nav>
+        <div class="phase-actions">
+          <button id="phase-current" class="phase-current" disabled></button>
+          <button id="next-phase" class="primary" title="Space">パス</button>
+          <button id="end-turn" title="Enter：相手が何かするか、自分の次のターンまで自動でパス">ターン終了まで</button>
+          <button id="undo-mana" hidden title="Ctrl+Z：スタックに何かが乗る前なら、マナのためのタップを取り消す">元に戻す（Ctrl+Z）</button>
+        </div>
+      </aside>
+
+      <aside class="col-player">
+        <div id="opp-player" class="player-block opp">
+          <div class="avatar" id="opp-avatar" aria-hidden="true"></div>
+          <div class="player-name" id="opp-player-name"></div>
+          <div class="life"><span id="opp-life" class="opp-life"></span></div>
+          <div class="pool" id="opp-pool"></div>
+          <div class="mana-avail" id="opp-mana" title="アンタップ状態の土地などから出せるマナ"></div>
+          <div class="piles">
+            <div class="pile static" title="ライブラリーの枚数">
+              <span class="pile-icon icon-library" aria-hidden="true"></span>
+              <span class="pile-count" id="opp-library-count"></span>
+              <span class="pile-name">ライブラリー</span>
+            </div>
+            <div class="pile static" title="手札の枚数">
+              <span class="pile-icon icon-hand" aria-hidden="true"></span>
+              <span class="pile-count" id="opp-hand-count"></span>
+              <span class="pile-name">手札</span>
+            </div>
+            <div class="pile" id="opp-pile-graveyard" title="墓地：クリックで一覧">
+              <span class="pile-icon icon-graveyard" aria-hidden="true"></span>
+              <span class="pile-count" id="opp-graveyard-count"></span>
+              <span class="pile-name">墓地</span>
+            </div>
+            <div class="pile" id="opp-pile-exile" title="追放：クリックで一覧">
+              <span class="pile-icon icon-exile" aria-hidden="true"></span>
+              <span class="pile-count" id="opp-exile-count"></span>
+              <span class="pile-name">追放</span>
+            </div>
+          </div>
+        </div>
+        <div id="my-player" class="player-block me">
+          <div class="avatar mine" id="my-avatar"></div>
+          <div class="player-name" id="my-player-name">あなた</div>
+          <div class="life"><span id="life"></span></div>
+          <div class="pool" id="my-pool" title="マナ・プール"></div>
+          <div class="mana-avail" id="my-mana" title="アンタップ状態の土地などから出せるマナ（呪文を唱えると自動で支払われます）"></div>
+          <div class="piles">
+            <div class="pile static" id="pile-library" title="ライブラリーの枚数">
+              <span class="pile-icon icon-library" aria-hidden="true"></span>
+              <span class="pile-count" id="library-count"></span>
+              <span class="pile-name">ライブラリー</span>
+            </div>
+            <div class="pile" id="pile-graveyard" title="墓地：クリックで一覧（フラッシュバックもここから）">
+              <span class="pile-icon icon-graveyard" aria-hidden="true"></span>
+              <span class="pile-count" id="graveyard-count"></span>
+              <span class="pile-name">墓地</span>
+            </div>
+            <div class="pile" id="pile-exile" title="追放：クリックで一覧">
+              <span class="pile-icon icon-exile" aria-hidden="true"></span>
+              <span class="pile-count" id="exile-count"></span>
+              <span class="pile-name">追放</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="board">
+        <div id="ticker" class="ticker" aria-live="polite"></div>
+        <div id="announce" class="announce" hidden></div>
+        <div id="opp-area" class="opp-area">
+          <div id="opp-status" class="opp-status"></div>
+          <div id="room-banner" class="room-banner" hidden>
+            <span class="room-label">部屋コード</span>
+            <strong id="room-code-big" class="room-code-big"></strong>
+            <span class="room-note" id="room-note">このコードを相手に伝えてください</span>
+            <button type="button" id="room-share">共有・コピー</button>
+          </div>
+          <div class="battlefield opp">
+            <div id="opp-lands" class="bf-row lands"></div>
+            <div id="opp-main" class="bf-row"></div>
+          </div>
+        </div>
+        <div id="stack" class="stack-panel" hidden>
+          <span class="stack-label">スタック</span>
+          <div id="stack-items" class="stack-items"></div>
+        </div>
+        <div id="mulligan-bar" class="banner" hidden></div>
+        <div class="battlefield">
+          <div id="bf-main" class="bf-row"></div>
+          <div id="bf-lands" class="bf-row lands"></div>
+        </div>
+        <div class="hand-area">
+          <div class="zone-label">手札 <span id="hand-count"></span></div>
+          <div id="hand" class="hand"></div>
+        </div>
+      </section>
+
+      <aside class="col-right">
+        <section class="panel log-box">
+          <h2 class="panel-head">ログ</h2>
+          <ol id="log" class="log chat"></ol>
+        </section>
+        <section class="panel">
+          <h2 class="panel-head">コマンド</h2>
+          <div class="tools" id="tools">
+            <button type="button" data-sound-toggle>効果音：オン</button>
+            <button id="stops-toggle" title="オンにすると、自分が何もできないステップでも止まる">すべてのステップで止まる：オフ</button>
+            <button id="concede">投了</button>
+            <a class="button-link" href="duel.html">今までのルール対戦（内蔵エンジン・ネット対戦）</a>
+            <div class="felt-picker tools-felt"></div>
+            <div class="lang-picker tools-lang"></div>
+          </div>
+        </section>
+        <p class="hint">
+          手札: クリックで土地をプレイ・呪文を唱える<br>
+          土地: クリックでマナを出す（W＋クリックで色を自動で選ぶ・Ctrl+Z で取り消し）<br>
+          呪文: クリックすると「マナを支払ってください」→ 土地をクリック（「自動で支払う」も可）<br>
+          右クリック／長押しで詳細・メニュー
+        </p>
+      </aside>
+    </main>
+
+    <nav class="phone-bar">
+      <a href="index.html">デッキ</a>
+      <button type="button" id="sheet-log-btn" data-phone-sheet="log">ログ</button>
+      <button type="button" data-phone-sheet="tools">コマンド</button>
+    </nav>
+
+    <nav class="bottombar">
+      <a href="index.html">デッキ作成</a>
+      <a href="play.html">一人回し・対戦</a>
+      <a href="duel.html">ルール対戦</a>
+      <span class="active">ルール対戦（phase.rs）</span>
+    </nav>
+  </div>
+
+  <dialog id="setup" class="setup">
+    <h2 class="panel-head">ルール対戦の開始 <span class="lang-picker setup-lang"></span></h2>
+    <form method="dialog" id="setup-form" class="dialog-body">
+      <p class="note">ルールエンジンに <a href="https://github.com/phase-rs/phase" target="_blank" rel="noopener">phase.rs</a>（MIT / Apache-2.0）を使う対戦です。初回はエンジン（約13MB）の読み込みに時間がかかります。いまは旧枠モダンのカード（約1000種類）に対応しています。</p>
+      <label class="field">デッキ <select id="setup-deck"></select></label>
+      <label class="field">CPUのデッキ <select id="setup-cpu-deck"></select></label>
+      <label class="field">CPUの強さ <select id="setup-level">
+        <option value="Easy">やさしい</option>
+        <option value="Medium" selected>ふつう</option>
+        <option value="Hard">つよい</option>
+      </select></label>
+      <fieldset class="order well">
+        <legend>順番</legend>
+        <label><input type="radio" name="order" value="random" checked> ランダム</label>
+        <label><input type="radio" name="order" value="play"> 先手</label>
+        <label><input type="radio" name="order" value="draw"> 後手</label>
+      </fieldset>
+      <div id="setup-support" class="support-report"></div>
+      <p id="setup-error" class="error"></p>
+      <div class="dialog-actions">
+        <a href="duel.html">今までのルール対戦</a>
+        <a href="index.html">デッキ作成に戻る</a>
+        <button value="start" class="primary" id="setup-start">開始</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="viewer" class="viewer">
+    <h2 class="panel-head" id="viewer-title"></h2>
+    <div class="dialog-body">
+      <p class="hint" id="viewer-hint"></p>
+      <div id="viewer-cards" class="viewer-cards well"></div>
+      <div class="dialog-actions">
+        <button id="viewer-ok" class="primary" hidden>決定</button>
+        <button id="viewer-close">閉じる</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="result" class="result">
+    <div class="dialog-body">
+      <p id="result-title" class="result-title"></p>
+      <p id="result-text" class="result-text"></p>
+      <div class="dialog-actions">
+        <button id="result-close">閉じる</button>
+        <button id="result-again" class="primary">もう一度</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="menu" class="menu" hidden></div>
+
+  <script src="sound.js?v=2"></script>
+  <script type="module" src="phase.js?v=1"></script>
+</body>
+</html>
